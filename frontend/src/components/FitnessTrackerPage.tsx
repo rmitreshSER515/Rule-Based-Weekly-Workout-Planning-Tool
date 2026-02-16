@@ -1,14 +1,11 @@
 export default function FitnessTrackerPage() {
   return (
     <div className="min-h-screen w-full relative overflow-hidden bg-slate-950 flex items-center justify-center px-5 py-10">
-      {/* Background gradient (same as LoginPage) */}
       <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-950" />
 
-      {/* Fitness “energy” glows (same as LoginPage) */}
       <div className="absolute -top-32 -left-32 h-[520px] w-[520px] rounded-full bg-fuchsia-500/20 blur-[90px]" />
       <div className="absolute -bottom-40 -right-40 h-[620px] w-[620px] rounded-full bg-cyan-400/15 blur-[110px]" />
 
-      {/* Subtle dotted texture (same as LoginPage) */}
       <div
         className="absolute inset-0 opacity-[0.10]"
         style={{
@@ -18,7 +15,6 @@ export default function FitnessTrackerPage() {
         }}
       />
 
-      {/* Glass panel (same style as LoginPage card) */}
       <div className="relative z-10 w-full max-w-5xl rounded-2xl border border-white/15 bg-white/10 backdrop-blur-xl shadow-[0_18px_60px_rgba(0,0,0,0.45)] overflow-hidden">
         {/* Header */}
         <div className="py-10 text-center border-b border-white/15">
