@@ -1,25 +1,110 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-
 
 export default function LoginPage() {
   const [emailOrUser, setEmailOrUser] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [emailError, setEmailError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [touched, setTouched] = useState({ email: false, password: false });
   const navigate = useNavigate();
 
-  const onSubmit = (e: React.FormEvent) => {
-  e.preventDefault();
-  // no backend yet — just navigate
-  navigate("/fitness");
-};
+  // Password criteria checks
+  const passwordCriteria = {
+    minLength: password.length >= 6,
+    hasUpperCase: /[A-Z]/.test(password),
+    hasLowerCase: /[a-z]/.test(password),
+    hasNumber: /[0-9]/.test(password),
+  };
+
+  const allCriteriaMet = Object.values(passwordCriteria).every(Boolean);
+
+  // Real-time validation
+  useEffect(() => {
+    if (touched.email && emailOrUser) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(emailOrUser)) {
+        setEmailError("Please enter a valid email address");
+      } else {
+        setEmailError("");
+      }
+    } else if (touched.email && !emailOrUser) {
+      setEmailError("Email address is required");
+    }
+  }, [emailOrUser, touched.email]);
+
+  useEffect(() => {
+    if (touched.password && password) {
+      if (!allCriteriaMet) {
+        setPasswordError("Password doesn't meet all requirements");
+      } else {
+        setPasswordError("");
+      }
+    }
+  }, [password, touched.password, allCriteriaMet]);
+
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Mark all fields as touched
+    setTouched({ email: true, password: true });
+    
+    // Reset errors
+    setEmailError("");
+    setPasswordError("");
+    
+    let hasError = false;
+    
+    // Validate email
+    if (!emailOrUser.trim()) {
+      setEmailError("Email address is required");
+      hasError = true;
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(emailOrUser)) {
+        setEmailError("Please enter a valid email address");
+        hasError = true;
+      }
+    }
+    
+    // Validate password
+    if (!password) {
+      setPasswordError("Password is required");
+      hasError = true;
+    } else if (!allCriteriaMet) {
+      setPasswordError("Password doesn't meet all requirements");
+      hasError = true;
+    }
+    
+    if (hasError) return;
+    
+    setIsLoading(true);
+    console.log({ emailOrUser, password, remember });
+    
+    // Simulate API call
+    setTimeout(() => {
+      setIsLoading(false);
+      // Navigate to fitness tracker page after successful login
+      navigate("/fitness");
+    }, 2000);
+  };
+
+  const isFormValid = 
+    emailOrUser.trim() && 
+    password && 
+    !emailError && 
+    !passwordError &&
+    allCriteriaMet;
 
   return (
     <div className="min-h-screen w-full relative flex items-center justify-center px-5 py-10 overflow-hidden bg-slate-950">
       {/* Background gradient */}
       <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-950" />
 
-      {/* Fitness “energy” glows */}
+      {/* Fitness "energy" glows */}
       <div className="absolute -top-32 -left-32 h-[520px] w-[520px] rounded-full bg-fuchsia-500/20 blur-[90px]" />
       <div className="absolute -bottom-40 -right-40 h-[620px] w-[620px] rounded-full bg-cyan-400/15 blur-[110px]" />
 
@@ -48,9 +133,14 @@ export default function LoginPage() {
             <div className="relative">
               <input
                 value={emailOrUser}
-                onChange={(e) => setEmailOrUser(e.target.value)}
-                placeholder="Username or Email"
-                className="w-full rounded-full bg-white/10 text-white placeholder-white/60 px-5 py-3.5 pr-12 outline-none border border-white/15 focus:border-white/35 focus:ring-2 focus:ring-white/20"
+                onChange={(e) => {
+                  setEmailOrUser(e.target.value);
+                }}
+                onBlur={() => setTouched({ ...touched, email: true })}
+                placeholder="Email Address"
+                className={`w-full rounded-full bg-white/10 text-white placeholder-white/60 px-5 py-3.5 pr-12 outline-none border ${
+                  emailError ? 'border-red-400' : 'border-white/15'
+                } focus:border-white/35 focus:ring-2 focus:ring-white/20`}
               />
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-white/70">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
@@ -67,31 +157,98 @@ export default function LoginPage() {
                   />
                 </svg>
               </span>
+              {emailError && (
+                <p className="text-red-400 text-xs mt-1.5 ml-5">{emailError}</p>
+              )}
             </div>
 
-            <div className="relative">
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Password"
-                className="w-full rounded-full bg-white/10 text-white placeholder-white/60 px-5 py-3.5 pr-12 outline-none border border-white/15 focus:border-white/35 focus:ring-2 focus:ring-white/20"
-              />
-              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-white/70">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                  <path
-                    d="M17 11V8a5 5 0 0 0-10 0v3"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                  />
-                  <path
-                    d="M6.5 11h11A2.5 2.5 0 0 1 20 13.5v6A2.5 2.5 0 0 1 17.5 22h-11A2.5 2.5 0 0 1 4 19.5v-6A2.5 2.5 0 0 1 6.5 11Z"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  />
-                </svg>
-              </span>
+            <div>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                  }}
+                  onBlur={() => setTouched({ ...touched, password: true })}
+                  placeholder="Password"
+                  className={`w-full rounded-full bg-white/10 text-white placeholder-white/60 px-5 py-3.5 pr-12 outline-none border ${
+                    passwordError ? 'border-red-400' : 'border-white/15'
+                  } focus:border-white/35 focus:ring-2 focus:ring-white/20`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white"
+                >
+                  {showPassword ? (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                      <path
+                        d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      />
+                      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" />
+                    </svg>
+                  ) : (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                      <path
+                        d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      />
+                      <path
+                        d="M3 3l18 18"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  )}
+                </button>
+              </div>
+              
+              {/* Password criteria */}
+              {password && (
+                <div className="mt-2 ml-5 space-y-1">
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className={passwordCriteria.minLength ? 'text-green-400' : 'text-white/60'}>
+                      {passwordCriteria.minLength ? '✓' : '○'}
+                    </span>
+                    <span className={passwordCriteria.minLength ? 'text-white/90' : 'text-white/60'}>
+                      At least 6 characters
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className={passwordCriteria.hasUpperCase ? 'text-green-400' : 'text-white/60'}>
+                      {passwordCriteria.hasUpperCase ? '✓' : '○'}
+                    </span>
+                    <span className={passwordCriteria.hasUpperCase ? 'text-white/90' : 'text-white/60'}>
+                      One uppercase letter
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className={passwordCriteria.hasLowerCase ? 'text-green-400' : 'text-white/60'}>
+                      {passwordCriteria.hasLowerCase ? '✓' : '○'}
+                    </span>
+                    <span className={passwordCriteria.hasLowerCase ? 'text-white/90' : 'text-white/60'}>
+                      One lowercase letter
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className={passwordCriteria.hasNumber ? 'text-green-400' : 'text-white/60'}>
+                      {passwordCriteria.hasNumber ? '✓' : '○'}
+                    </span>
+                    <span className={passwordCriteria.hasNumber ? 'text-white/90' : 'text-white/60'}>
+                      One number
+                    </span>
+                  </div>
+                </div>
+              )}
+              
+              {passwordError && (
+                <p className="text-red-400 text-xs mt-1.5 ml-5">{passwordError}</p>
+              )}
             </div>
 
             <div className="flex items-center justify-between text-sm">
@@ -115,9 +272,32 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              className="w-full rounded-full bg-white text-slate-900 font-semibold py-3.5 shadow hover:opacity-95 active:opacity-90"
+              disabled={isLoading || !isFormValid}
+              className="w-full rounded-full bg-white text-slate-900 font-semibold py-3.5 shadow hover:opacity-95 active:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              Login
+              {isLoading ? (
+                <>
+                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                      fill="none"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                  Logging in...
+                </>
+              ) : (
+                "Login"
+              )}
             </button>
 
             <p className="text-center text-sm text-white/70">
