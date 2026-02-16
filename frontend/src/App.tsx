@@ -1,5 +1,14 @@
+import { Routes, Route, Navigate } from "react-router-dom";
 import LoginPage from "./components/LoginPage";
+import FitnessTrackerPage from "./components/FitnessTrackerPage";
 
 export default function App() {
-  return <LoginPage />;
+  return (
+    <Routes>
+      <Route path="/" element={<Navigate to="/login" replace />} />
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/fitness" element={<FitnessTrackerPage />} />
+      <Route path="*" element={<Navigate to="/login" replace />} />
+    </Routes>
+  );
 }

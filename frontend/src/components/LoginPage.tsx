@@ -1,14 +1,18 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+
 
 export default function LoginPage() {
   const [emailOrUser, setEmailOrUser] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
+  const navigate = useNavigate();
 
   const onSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log({ emailOrUser, password, remember });
-  };
+  e.preventDefault();
+  // no backend yet — just navigate
+  navigate("/fitness");
+};
 
   return (
     <div className="min-h-screen w-full relative flex items-center justify-center px-5 py-10 overflow-hidden bg-slate-950">
