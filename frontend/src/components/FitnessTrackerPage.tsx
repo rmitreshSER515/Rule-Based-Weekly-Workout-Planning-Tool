@@ -60,7 +60,7 @@ export default function FitnessTrackerPage() {
             </button>
                         <button
               type="button"
-              onClick={() => console.log("Create New Schedules Clicked")}
+              onClick={() => navigate("/schedules", { state: { mode: "create" } })}
               className="w-full sm:w-fit flex items-center gap-4 rounded-xl px-5 py-4 bg-white/5 hover:bg-white/10 active:bg-white/15 border border-white/10 focus:outline-none focus:ring-2 focus:ring-white/30"
             >
               <span aria-hidden="true" className="text-white/80">
