@@ -12,7 +12,6 @@ export default function LoginPage() {
   const [touched, setTouched] = useState({ email: false, password: false });
   const navigate = useNavigate();
 
-  // Password criteria checks
   const passwordCriteria = {
     minLength: password.length >= 6,
     hasUpperCase: /[A-Z]/.test(password),
@@ -22,7 +21,6 @@ export default function LoginPage() {
 
   const allCriteriaMet = Object.values(passwordCriteria).every(Boolean);
 
-  // Real-time validation
   useEffect(() => {
     if (touched.email && emailOrUser) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -49,16 +47,14 @@ export default function LoginPage() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Mark all fields as touched
+ 
     setTouched({ email: true, password: true });
     
-    // Reset errors
     setEmailError("");
     setPasswordError("");
     
     let hasError = false;
     
-    // Validate email
     if (!emailOrUser.trim()) {
       setEmailError("Email address is required");
       hasError = true;
@@ -70,7 +66,6 @@ export default function LoginPage() {
       }
     }
     
-    // Validate password
     if (!password) {
       setPasswordError("Password is required");
       hasError = true;
@@ -84,10 +79,8 @@ export default function LoginPage() {
     setIsLoading(true);
     console.log({ emailOrUser, password, remember });
     
-    // Simulate API call
     setTimeout(() => {
       setIsLoading(false);
-      // Navigate to fitness tracker page after successful login
       navigate("/fitness");
     }, 2000);
   };
@@ -101,14 +94,11 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen w-full relative flex items-center justify-center px-5 py-10 overflow-hidden bg-slate-950">
-      {/* Background gradient */}
       <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-950" />
 
-      {/* Fitness "energy" glows */}
       <div className="absolute -top-32 -left-32 h-[520px] w-[520px] rounded-full bg-fuchsia-500/20 blur-[90px]" />
       <div className="absolute -bottom-40 -right-40 h-[620px] w-[620px] rounded-full bg-cyan-400/15 blur-[110px]" />
 
-      {/* Subtle dotted texture */}
       <div
         className="absolute inset-0 opacity-[0.10]"
         style={{
@@ -208,7 +198,6 @@ export default function LoginPage() {
                 </button>
               </div>
               
-              {/* Password criteria */}
               {password && (
                 <div className="mt-2 ml-5 space-y-1">
                   <div className="flex items-center gap-2 text-xs">
