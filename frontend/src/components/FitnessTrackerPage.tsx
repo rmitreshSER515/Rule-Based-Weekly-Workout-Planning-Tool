@@ -1,4 +1,8 @@
+import { useNavigate } from "react-router-dom";
+
 export default function FitnessTrackerPage() {
+  const navigate = useNavigate();
+
   return (
     <div className="min-h-screen w-full relative overflow-hidden bg-slate-950 flex items-center justify-center px-5 py-10">
       <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-950" />
@@ -31,7 +35,7 @@ export default function FitnessTrackerPage() {
           <div className="space-y-6 text-3xl text-white flex flex-col items-center">
             <button
               type="button"
-              onClick={() => console.log("View Schedules clicked")}
+              onClick={() => navigate("/schedules")}
               className="w-full sm:w-fit flex items-center gap-4 rounded-xl px-5 py-4 bg-white/5 hover:bg-white/10 active:bg-white/15 border border-white/10 focus:outline-none focus:ring-2 focus:ring-white/30"
             >
               <span aria-hidden="true" className="text-white/80">
