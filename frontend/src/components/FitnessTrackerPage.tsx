@@ -54,6 +54,18 @@ export default function FitnessTrackerPage() {
                 Compare Schedules
               </span>
             </button>
+                        <button
+              type="button"
+              onClick={() => console.log("Create New Schedules Clicked")}
+              className="w-full sm:w-fit flex items-center gap-4 rounded-xl px-5 py-4 bg-white/5 hover:bg-white/10 active:bg-white/15 border border-white/10 focus:outline-none focus:ring-2 focus:ring-white/30"
+            >
+              <span aria-hidden="true" className="text-white/80">
+                
+              </span>
+              <span className="underline-offset-4 hover:underline">
+                Create New Schedules
+              </span>
+            </button>
           </div>
         </div>
       </div>
