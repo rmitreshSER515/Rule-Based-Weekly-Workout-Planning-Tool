@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
+
 
 export default function LoginPage() {
   const [emailOrUser, setEmailOrUser] = useState("");
@@ -301,14 +302,11 @@ export default function LoginPage() {
             </button>
 
             <p className="text-center text-sm text-white/70">
-              Don&apos;t have an account?{" "}
-              <button
-                type="button"
-                className="text-white underline underline-offset-4 hover:opacity-90"
-              >
-                Register
-              </button>
-            </p>
+  Don&apos;t have an account?{" "}
+  <Link to="/register" className="text-white underline underline-offset-4 hover:opacity-90">
+  Register
+</Link>
+</p>
           </form>
         </div>
       </div>
