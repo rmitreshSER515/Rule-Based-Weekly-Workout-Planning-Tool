@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useLocation } from "react-router-dom";
 
 const getDaysInRange = (startDate: Date, endDate: Date): Date[] => {
   const days: Date[] = [];
@@ -19,6 +20,9 @@ const formatDayName = (date: Date): string => {
 };
 
 export default function SchedulePage() {
+  const location = useLocation();
+  const isCreateMode = (location.state as { mode?: string } | null)?.mode === "create";
+
   // Initialize dates for current week
   const today = new Date();
   const nextWeek = new Date(today);
@@ -86,7 +90,14 @@ export default function SchedulePage() {
         <div className="p-4 border-b border-white/15 bg-white/5 backdrop-blur-xl">
           <div className="flex items-center justify-between gap-4 mb-4">
             <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold text-white">{scheduleTitle}</h1>
+              <h1 className="text-2xl font-bold text-white">
+                {isCreateMode ? "New Schedule" : scheduleTitle}
+              </h1>
+              {isCreateMode && (
+                <span className="rounded-full bg-emerald-500/30 text-emerald-300 text-xs font-medium px-2 py-0.5">
+                  Create new
+                </span>
+              )}
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
                 <path d="M6 9l6 6 6-6" />
               </svg>
