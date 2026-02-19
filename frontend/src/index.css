@@ -12,3 +12,28 @@ body {
   min-height: 100vh;
   background: #111827; /* dark outer background like the screenshot */
 }
+
+/* Schedule page: prominent horizontal scrollbar for multi-week view */
+.schedule-calendar-scroll {
+  scrollbar-width: auto;
+  scrollbar-color: rgba(94, 234, 212, 0.6) rgba(30, 41, 59, 0.8);
+}
+
+.schedule-calendar-scroll::-webkit-scrollbar {
+  height: 14px;
+}
+
+.schedule-calendar-scroll::-webkit-scrollbar-track {
+  background: rgba(30, 41, 59, 0.9);
+  border-radius: 6px;
+  margin: 0 8px;
+}
+
+.schedule-calendar-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(90deg, rgba(20, 184, 166, 0.7), rgba(34, 211, 238, 0.7));
+  border-radius: 6px;
+}
+
+.schedule-calendar-scroll::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(90deg, rgba(20, 184, 166, 0.9), rgba(34, 211, 238, 0.9));
+}
