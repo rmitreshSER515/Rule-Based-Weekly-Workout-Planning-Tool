@@ -287,7 +287,30 @@ export default function RegisterPage() {
                   onClick={() => setShowPassword((v) => !v)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white"
                 >
-                  {showPassword ? "Hide" : "Show"}
+                  {showPassword ? (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                      <path
+                        d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      />
+                      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" />
+                    </svg>
+                  ) : (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                      <path
+                        d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      />
+                      <path
+                        d="M3 3l18 18"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  )}
                 </button>
               </div>
 
@@ -351,7 +374,30 @@ export default function RegisterPage() {
                   onClick={() => setShowConfirm((v) => !v)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white"
                 >
-                  {showConfirm ? "Hide" : "Show"}
+                  {showConfirm ? (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                      <path
+                        d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      />
+                      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" />
+                    </svg>
+                  ) : (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                      <path
+                        d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      />
+                      <path
+                        d="M3 3l18 18"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  )}
                 </button>
               </div>
               {errors.confirm && (
@@ -364,7 +410,29 @@ export default function RegisterPage() {
               disabled={isLoading || !isFormValid}
               className="w-full rounded-full bg-white text-slate-900 font-semibold py-3.5 shadow hover:opacity-95 active:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              {isLoading ? "Creating..." : "Create Account"}
+              {isLoading ? (
+                <>
+                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                      fill="none"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                  Creating...
+                </>
+              ) : (
+                "Create Account"
+              )}
             </button>
 
             <p className="text-center text-sm text-white/70">
