@@ -65,16 +65,6 @@ export default function SchedulePage() {
           <div className="flex-1 overflow-y-auto px-4 pb-4">
             {/* Exercises list will go here */}
           </div>
-          <div className="shrink-0 p-4 pt-0">
-            <button
-              type="button"
-              className="w-full rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 text-center flex items-center justify-center gap-2"
-              aria-label="Add exercise"
-            >
-              <span aria-hidden>+</span>
-              <span>Add exercise</span>
-            </button>
-          </div>
         </div>
 
         {/* Rules Panel */}
