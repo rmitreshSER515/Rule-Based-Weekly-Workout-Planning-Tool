@@ -36,6 +36,33 @@ export default function SchedulePage() {
   );
   const [scheduleTitle] = useState<string>("Triathlon Schedule");
 
+  const [showAddExerciseModal, setShowAddExerciseModal] = useState(false);
+  const [exerciseName, setExerciseName] = useState("");
+  const [exerciseNotes, setExerciseNotes] = useState("");
+  const [exercises, setExercises] = useState<{ id: string; name: string; notes: string }[]>([]);
+
+  const openAddExerciseModal = () => {
+    setExerciseName("");
+    setExerciseNotes("");
+    setShowAddExerciseModal(true);
+  };
+
+  const closeAddExerciseModal = () => {
+    setShowAddExerciseModal(false);
+    setExerciseName("");
+    setExerciseNotes("");
+  };
+
+  const handleAddExerciseSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!exerciseName.trim()) return;
+    setExercises((prev) => [
+      ...prev,
+      { id: crypto.randomUUID(), name: exerciseName.trim(), notes: exerciseNotes.trim() },
+    ]);
+    closeAddExerciseModal();
+  };
+
   const days = useMemo(() => {
     const start = new Date(startDate);
     const end = new Date(endDate);
@@ -74,12 +101,23 @@ export default function SchedulePage() {
               Exercises
             </button>
           </div>
-          <div className="flex-1 overflow-y-auto px-4 pb-4">
-            {/* Exercises list will go here */}
+          <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-2">
+            {exercises.map((ex) => (
+              <div
+                key={ex.id}
+                className="rounded-lg bg-blue-500/20 border border-blue-400/30 px-3 py-2"
+              >
+                <p className="text-white font-medium text-sm">{ex.name}</p>
+                {ex.notes ? (
+                  <p className="text-white/70 text-xs mt-1">{ex.notes}</p>
+                ) : null}
+              </div>
+            ))}
           </div>
           <div className="shrink-0 p-4 pt-0">
             <button
               type="button"
+              onClick={openAddExerciseModal}
               className="w-full rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 text-center flex items-center justify-center gap-2"
               aria-label="Add exercise"
             >
@@ -194,6 +232,68 @@ export default function SchedulePage() {
           </div>
         </div>
       </div>
+
+      {/* Add Exercise Modal */}
+      {showAddExerciseModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={closeAddExerciseModal}
+        >
+          <div
+            className="relative w-full max-w-md rounded-2xl border border-white/15 bg-slate-900 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6">
+              <h2 className="text-xl font-bold text-white mb-4">Add exercise</h2>
+              <form onSubmit={handleAddExerciseSubmit} className="space-y-4">
+                <div>
+                  <label htmlFor="exercise-name" className="block text-sm font-medium text-white/80 mb-1">
+                    Name
+                  </label>
+                  <input
+                    id="exercise-name"
+                    type="text"
+                    value={exerciseName}
+                    onChange={(e) => setExerciseName(e.target.value)}
+                    placeholder="e.g. Running"
+                    className="w-full rounded-lg bg-white/10 border border-white/15 text-white placeholder-white/40 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label htmlFor="exercise-notes" className="block text-sm font-medium text-white/80 mb-1">
+                    Notes
+                  </label>
+                  <textarea
+                    id="exercise-notes"
+                    value={exerciseNotes}
+                    onChange={(e) => setExerciseNotes(e.target.value)}
+                    placeholder="Optional notes..."
+                    rows={3}
+                    className="w-full rounded-lg bg-white/10 border border-white/15 text-white placeholder-white/40 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  />
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={closeAddExerciseModal}
+                    className="flex-1 rounded-lg border border-white/20 bg-white/5 text-white py-2.5 font-medium hover:bg-white/10"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={!exerciseName.trim()}
+                    className="flex-1 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-2.5 font-medium"
+                  >
+                    Add
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
