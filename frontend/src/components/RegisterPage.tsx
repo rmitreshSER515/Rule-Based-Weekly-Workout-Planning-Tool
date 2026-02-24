@@ -7,6 +7,7 @@ export default function RegisterPage() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
+  const [countryCode, setCountryCode] = useState("+1");
   const [email, setEmail] = useState("");
 
   const [password, setPassword] = useState("");
@@ -239,15 +240,39 @@ export default function RegisterPage() {
 
             {/* Phone */}
             <div>
-              <input
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                onBlur={() => setTouched((p) => ({ ...p, phone: true }))}
-                placeholder="Phone Number"
-                className={`w-full rounded-full bg-white/10 text-white placeholder-white/60 px-5 py-3.5 outline-none border ${
-                  errors.phone ? "border-red-400" : "border-white/15"
-                } focus:border-white/35 focus:ring-2 focus:ring-white/20`}
-              />
+              <div className="relative flex gap-2">
+                <select
+                  value={countryCode}
+                  onChange={(e) => setCountryCode(e.target.value)}
+                  className="rounded-full bg-white/10 text-white px-4 py-3.5 outline-none border border-white/15 focus:border-white/35 focus:ring-2 focus:ring-white/20 appearance-none pr-8"
+                  style={{ width: '110px' }}
+                >
+                  <option value="+1" className="bg-slate-900">🇺🇸 +1</option>
+                  <option value="+44" className="bg-slate-900">🇬🇧 +44</option>
+                  <option value="+91" className="bg-slate-900">🇮🇳 +91</option>
+                  <option value="+86" className="bg-slate-900">🇨🇳 +86</option>
+                  <option value="+81" className="bg-slate-900">🇯🇵 +81</option>
+                  <option value="+49" className="bg-slate-900">🇩🇪 +49</option>
+                  <option value="+33" className="bg-slate-900">🇫🇷 +33</option>
+                  <option value="+61" className="bg-slate-900">🇦🇺 +61</option>
+                  <option value="+55" className="bg-slate-900">🇧🇷 +55</option>
+                  <option value="+7" className="bg-slate-900">🇷🇺 +7</option>
+                  <option value="+82" className="bg-slate-900">🇰🇷 +82</option>
+                  <option value="+34" className="bg-slate-900">🇪🇸 +34</option>
+                  <option value="+39" className="bg-slate-900">🇮🇹 +39</option>
+                  <option value="+52" className="bg-slate-900">🇲🇽 +52</option>
+                  <option value="+27" className="bg-slate-900">🇿🇦 +27</option>
+                </select>
+                <input
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  onBlur={() => setTouched((p) => ({ ...p, phone: true }))}
+                  placeholder="Phone Number"
+                  className={`flex-1 rounded-full bg-white/10 text-white placeholder-white/60 px-5 py-3.5 outline-none border ${
+                    errors.phone ? "border-red-400" : "border-white/15"
+                  } focus:border-white/35 focus:ring-2 focus:ring-white/20`}
+                />
+              </div>
               {errors.phone && (
                 <p className="text-red-400 text-xs mt-1.5 ml-5">{errors.phone}</p>
               )}
