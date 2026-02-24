@@ -18,8 +18,8 @@ interface RuleData {
 
 const exercises = ["Hard", "Easy", "Medium"];
 const activityTypes = ["Running", "Biking", "Swimming", "Cycling"];
-const timings = ["the day before", "the day after", "the same day", "within 2 days"];
-const restrictions = ["not allowed", "allowed", "optional"];
+const timings = ["the day before", "the day after", "the same day"];
+const restrictions = ["not allowed", "allowed"];
 
 export default function CreateRuleModal({ isOpen, onClose, onSave }: CreateRuleModalProps) {
   const [ruleName, setRuleName] = useState("");
