@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useLocation } from "react-router-dom";
+import RuleSelector from "./RuleSelector";
 
 const getDaysInRange = (startDate: Date, endDate: Date): Date[] => {
   const days: Date[] = [];
@@ -22,6 +23,8 @@ const formatDayName = (date: Date): string => {
 export default function SchedulePage() {
   const location = useLocation();
   const isCreateMode = (location.state as { mode?: string } | null)?.mode === "create";
+  const [isRuleSelectorOpen, setIsRuleSelectorOpen] = useState(false);
+  const [selectedRules, setSelectedRules] = useState<any[]>([]);
 
   // Initialize dates for current week
   const today = new Date();
@@ -49,6 +52,10 @@ export default function SchedulePage() {
     }
     return result;
   }, [days]);
+
+  const handleApplyRules = (rules: any[]) => {
+    setSelectedRules(rules);
+  };
 
   return (
     <div className="min-h-screen w-full relative overflow-hidden bg-slate-950 flex">
@@ -92,12 +99,38 @@ export default function SchedulePage() {
         {/* Rules Panel */}
         <div className="flex flex-col h-1/2">
           <div className="p-4">
-            <button className="w-full rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 px-4 text-center">
+            <button 
+              className="w-full rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 px-4 text-center"
+            >
               Rules
             </button>
           </div>
           <div className="flex-1 overflow-y-auto px-4 pb-4">
-            {/* Rules list will go here */}
+            {selectedRules.length > 0 ? (
+              <div className="space-y-2">
+                {selectedRules.map((rule, index) => (
+                  <div key={rule.id} className="p-2 rounded-lg bg-white/5 border border-white/10">
+                    <p className="text-white font-medium text-sm truncate">{rule.name}</p>
+                    <p className="text-white/50 text-xs truncate">
+                      If {rule.ifExercise} then {rule.thenActivityType} is {rule.thenRestriction}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-white/50 text-sm">No rules selected</p>
+            )}
+          </div>
+          <div className="shrink-0 p-4 pt-0">
+            <button
+              type="button"
+              onClick={() => setIsRuleSelectorOpen(true)}
+              className="w-full rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 px-4 text-center flex items-center justify-center gap-2"
+              aria-label="Add rule"
+            >
+              <span aria-hidden>+</span>
+              <span>Add rule</span>
+            </button>
           </div>
         </div>
       </div>
@@ -194,6 +227,13 @@ export default function SchedulePage() {
           </div>
         </div>
       </div>
+
+      {/* Rule Selector Modal */}
+      <RuleSelector
+        isOpen={isRuleSelectorOpen}
+        onClose={() => setIsRuleSelectorOpen(false)}
+        onApplyRules={handleApplyRules}
+      />
     </div>
   );
 }
