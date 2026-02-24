@@ -1,6 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
-
 import type { Condition, WhenCondition, RuleAction } from '../types/rule.types';
 
 export type RuleDocument = HydratedDocument<Rule>;
