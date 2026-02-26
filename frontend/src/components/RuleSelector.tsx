@@ -62,6 +62,7 @@ export default function RuleSelector({ isOpen, onClose, onApplyRules }: RuleSele
   };
 
   const handleApplyRules = () => {
+    if (selectedRuleIds.length === 0) return;
     const selected = rules.filter((rule) => selectedRuleIds.includes(rule.id));
     onApplyRules?.(selected);
     onClose();
@@ -141,7 +142,12 @@ export default function RuleSelector({ isOpen, onClose, onApplyRules }: RuleSele
               <div className="pt-6 border-t border-white/10 space-y-3">
                 <button
                   onClick={handleApplyRules}
-                  className="w-full rounded-lg bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:shadow-lg hover:shadow-emerald-500/40 text-white font-semibold py-3 px-4 transition-all hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-slate-950"
+                  disabled={selectedRuleIds.length === 0}
+                  className={`w-full rounded-lg font-semibold py-3 px-4 transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-950 ${
+                    selectedRuleIds.length === 0
+                      ? "bg-slate-600/60 text-white/40 cursor-not-allowed"
+                      : "bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:shadow-lg hover:shadow-emerald-500/40 text-white hover:scale-[1.02] active:scale-[0.98] focus:ring-emerald-400"
+                  }`}
                 >
                   Apply Selected Rules
                 </button>
