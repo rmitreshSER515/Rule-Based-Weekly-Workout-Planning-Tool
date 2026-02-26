@@ -4,6 +4,7 @@ interface CreateRuleModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (rule: RuleData) => void;
+  exercisesFromSidebar: { id: string; name: string; notes: string }[];
 }
 
 interface RuleData {
@@ -21,7 +22,7 @@ const activityTypes = ["Running", "Biking", "Swimming", "Cycling"];
 const timings = ["the day before", "the day after", "the same day"];
 const restrictions = ["not allowed", "allowed"];
 
-export default function CreateRuleModal({ isOpen, onClose, onSave }: CreateRuleModalProps) {
+export default function CreateRuleModal({ isOpen, onClose, onSave, exercisesFromSidebar }: CreateRuleModalProps) {
   const [ruleName, setRuleName] = useState("");
   const [ifExercise, setIfExercise] = useState("Hard");
   const [ifActivityType, setIfActivityType] = useState("Running");
@@ -121,9 +122,9 @@ export default function CreateRuleModal({ isOpen, onClose, onSave }: CreateRuleM
                       onChange={(e) => setIfExercise(e.target.value)}
                       className="rounded-lg bg-teal-600/80 hover:bg-teal-600 text-white font-medium px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white/30 cursor-pointer transition-colors"
                     >
-                      {exercises.map((ex) => (
-                        <option key={ex} value={ex}>
-                          {ex}
+                      {exercises.map((level) => (
+                        <option key={level} value={level}>
+                          {level}
                         </option>
                       ))}
                     </select>
@@ -132,9 +133,12 @@ export default function CreateRuleModal({ isOpen, onClose, onSave }: CreateRuleM
                       onChange={(e) => setIfActivityType(e.target.value)}
                       className="rounded-lg bg-teal-600/80 hover:bg-teal-600 text-white font-medium px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white/30 cursor-pointer transition-colors"
                     >
-                      {activityTypes.map((type) => (
-                        <option key={type} value={type}>
-                          {type}
+                      {exercisesFromSidebar.length === 0 && (
+                        <option value="">No exercises available</option>
+                      )}
+                      {exercisesFromSidebar.map((ex) => (
+                        <option key={ex.id} value={ex.name}>
+                          {ex.name}
                         </option>
                       ))}
                     </select>
@@ -161,9 +165,9 @@ export default function CreateRuleModal({ isOpen, onClose, onSave }: CreateRuleM
                       onChange={(e) => setThenExercise(e.target.value)}
                       className="rounded-lg bg-teal-600/80 hover:bg-teal-600 text-white font-medium px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white/30 cursor-pointer transition-colors"
                     >
-                      {exercises.map((ex) => (
-                        <option key={ex} value={ex}>
-                          {ex}
+                      {exercises.map((level) => (
+                        <option key={level} value={level}>
+                          {level}
                         </option>
                       ))}
                     </select>
@@ -172,9 +176,12 @@ export default function CreateRuleModal({ isOpen, onClose, onSave }: CreateRuleM
                       onChange={(e) => setThenActivityType(e.target.value)}
                       className="rounded-lg bg-teal-600/80 hover:bg-teal-600 text-white font-medium px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white/30 cursor-pointer transition-colors"
                     >
-                      {activityTypes.map((type) => (
-                        <option key={type} value={type}>
-                          {type}
+                      {exercisesFromSidebar.length === 0 && (
+                        <option value="">No exercises available</option>
+                      )}
+                      {exercisesFromSidebar.map((ex) => (
+                        <option key={ex.id} value={ex.name}>
+                          {ex.name}
                         </option>
                       ))}
                     </select>
