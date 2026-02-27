@@ -506,6 +506,7 @@ export default function SchedulePage() {
         isOpen={isRuleSelectorOpen}
         onClose={() => setIsRuleSelectorOpen(false)}
         onApplyRules={handleApplyRules}
+        exercises={exercises}
       />
     </div>
   );

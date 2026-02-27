@@ -5,6 +5,7 @@ interface RuleSelectorProps {
   isOpen: boolean;
   onClose: () => void;
   onApplyRules?: (selectedRules: Rule[]) => void;
+  exercises: { id: string; name: string; notes: string }[];
 }
 
 interface Rule {
@@ -18,7 +19,7 @@ interface Rule {
   thenRestriction: string;
 }
 
-export default function RuleSelector({ isOpen, onClose, onApplyRules }: RuleSelectorProps) {
+export default function RuleSelector({ isOpen, onClose, onApplyRules, exercises }: RuleSelectorProps) {
   const [isCreateRuleOpen, setIsCreateRuleOpen] = useState(false);
   const [selectedRuleIds, setSelectedRuleIds] = useState<number[]>([]);
   const [rules, setRules] = useState<Rule[]>([
@@ -162,6 +163,7 @@ export default function RuleSelector({ isOpen, onClose, onApplyRules }: RuleSele
         isOpen={isCreateRuleOpen}
         onClose={() => setIsCreateRuleOpen(false)}
         onSave={handleSaveRule}
+        exercisesFromSidebar={exercises}
       />
     </>
   );
