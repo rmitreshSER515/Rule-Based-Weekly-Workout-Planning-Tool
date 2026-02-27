@@ -37,7 +37,21 @@ export default function SchedulePage() {
   const [endDate, setEndDate] = useState<string>(
     nextWeek.toISOString().split("T")[0]
   );
-  const [scheduleTitle] = useState<string>("Triathlon Schedule");
+  const [scheduleTitle, setScheduleTitle] = useState<string>(() => {
+    return localStorage.getItem("scheduleTitle") || "";
+  });
+  const [isEditingTitle, setIsEditingTitle] = useState(() => {
+    return !localStorage.getItem("scheduleTitle");
+  });
+  const [titleDraft, setTitleDraft] = useState(scheduleTitle);
+
+  const handleTitleSave = () => {
+    const trimmed = titleDraft.trim();
+    if (!trimmed) return; 
+    setScheduleTitle(trimmed);
+    localStorage.setItem("scheduleTitle", trimmed);
+    setIsEditingTitle(false);
+  };
 
   const [showAddExerciseModal, setShowAddExerciseModal] = useState(false);
   const [exerciseName, setExerciseName] = useState("");
