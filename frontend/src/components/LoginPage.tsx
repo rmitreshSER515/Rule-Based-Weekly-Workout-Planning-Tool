@@ -47,14 +47,15 @@ export default function LoginPage() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
+    
+ 
     setTouched({ email: true, password: true });
-
+    
     setEmailError("");
     setPasswordError("");
-
+    
     let hasError = false;
-
+    
     if (!emailOrUser.trim()) {
       setEmailError("Email address is required");
       hasError = true;
@@ -65,7 +66,7 @@ export default function LoginPage() {
         hasError = true;
       }
     }
-
+    
     if (!password) {
       setPasswordError("Password is required");
       hasError = true;
@@ -73,44 +74,16 @@ export default function LoginPage() {
       setPasswordError("Password doesn't meet all requirements");
       hasError = true;
     }
-
+    
     if (hasError) return;
-
-    try {
-      setIsLoading(true);
-      const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
-
-      const response = await fetch(`${API_URL}/auth/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: emailOrUser.trim(),
-          password,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Login failed");
-      }
-
-      if (data.accessToken) {
-        localStorage.setItem("token", data.accessToken);
-      }
-      if (data.user) {
-        localStorage.setItem("user", JSON.stringify(data.user));
-      }
-
-      navigate("/fitness");
-    } catch (err: any) {
-      const msg = err?.message || "Login failed";
-      setPasswordError(msg);
-    } finally {
+    
+    setIsLoading(true);
+    console.log({ emailOrUser, password, remember });
+    
+    setTimeout(() => {
       setIsLoading(false);
-    }
+      navigate("/fitness");
+    }, 2000);
   };
 
   const isFormValid = 
