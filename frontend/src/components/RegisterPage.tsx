@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 
 export default function RegisterPage() {
   const navigate = useNavigate();
+  
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -146,27 +147,67 @@ export default function RegisterPage() {
     return ok;
   };
 
-  const onSubmit = (e: FormEvent) => {
-    e.preventDefault();
+  const onSubmit = async (e: FormEvent) => {
+  e.preventDefault();
 
-    setTouched({
-      firstName: true,
-      lastName: true,
-      phone: true,
-      email: true,
-      password: true,
-      confirm: true,
-    });
+  
 
-    if (!validateAll()) return;
+  setTouched({
+    firstName: true,
+    lastName: true,
+    phone: true,
+    email: true,
+    password: true,
+    confirm: true,
+  });
 
+  if (!validateAll()) return;
+
+  try {
     setIsLoading(true);
 
-    setTimeout(() => {
-      setIsLoading(false);
-      navigate("/"); 
-    }, 1200);
-  };
+    const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
+
+
+    const response = await fetch(`${API_URL}/auth/register`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        phoneNumber: countryCode + digitsOnlyPhone(phone),
+        email: email.trim(),
+        password,
+        confirmPassword,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || "Registration failed");
+    }
+
+    // If backend returns token
+    if (data.access_token) {
+      localStorage.setItem("token", data.access_token);
+    }
+
+    // Redirect after success
+    navigate("/");
+
+  } catch (error: any) {
+    setErrors((prev) => ({
+      ...prev,
+      email: error.message,
+    }));
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 
   const isFormValid =
     firstName.trim() &&
