@@ -1,6 +1,7 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import RuleSelector from "./RuleSelector";
+import { fetchExercises, createExercise, type ExerciseDto } from "../api/exercises";
 
 const getDaysInRange = (startDate: Date, endDate: Date): Date[] => {
   const days: Date[] = [];
@@ -57,6 +58,58 @@ export default function SchedulePage() {
   const [exerciseName, setExerciseName] = useState("");
   const [exerciseNotes, setExerciseNotes] = useState("");
   const [exercises, setExercises] = useState<{ id: string; name: string; notes: string }[]>([]);
+
+  const [userId, setUserId] = useState<string | null>(null);
+
+  // Load authenticated user id from localStorage (set during login/register)
+  useEffect(() => {
+    try {
+      const storedUserJson = localStorage.getItem("user");
+      if (!storedUserJson) {
+        setUserId(null);
+        return;
+      }
+      const storedUser = JSON.parse(storedUserJson);
+      const id = storedUser?.id ?? storedUser?._id ?? null;
+      setUserId(typeof id === "string" ? id : null);
+    } catch (err) {
+      console.error("Failed to read stored user", err);
+      setUserId(null);
+    }
+  }, []);
+
+  // Load exercises for this user on mount
+  useEffect(() => {
+    if (!userId) {
+      console.warn("No userId found; skipping exercise load");
+      return;
+    }
+
+    let cancelled = false;
+
+    const load = async () => {
+      try {
+        const items = await fetchExercises(userId);
+        if (cancelled) return;
+        setExercises(
+          items.map((ex: ExerciseDto) => ({
+            id: ex.id,
+            name: ex.name,
+            notes: ex.notes,
+          })),
+        );
+      } catch (err) {
+        // For now, fail silently; we can surface a toast later
+        console.error("Failed to load exercises", err);
+      }
+    };
+
+    load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
   // Drag-and-drop state
   const [calendarExercises, setCalendarExercises] = useState<
@@ -232,14 +285,27 @@ export default function SchedulePage() {
     setExerciseNotes("");
   };
 
-  const handleAddExerciseSubmit = (e: React.FormEvent) => {
+  const handleAddExerciseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!exerciseName.trim()) return;
-    setExercises((prev) => [
-      ...prev,
-      { id: crypto.randomUUID(), name: exerciseName.trim(), notes: exerciseNotes.trim() },
-    ]);
-    closeAddExerciseModal();
+    const name = exerciseName.trim();
+    if (!name || !userId) return;
+
+    try {
+      const created = await createExercise({
+        userId,
+        name,
+        notes: exerciseNotes.trim(),
+      });
+
+      setExercises((prev) => [
+        ...prev,
+        { id: created.id, name: created.name, notes: created.notes },
+      ]);
+      closeAddExerciseModal();
+    } catch (err) {
+      console.error("Failed to create exercise", err);
+      // We could show a toast or inline error in a follow-up iteration
+    }
   };
 
   const days = useMemo(() => {
@@ -668,7 +734,7 @@ export default function SchedulePage() {
           </div>
         </div>
       )}
-
+      
       {/* Add Exercise Modal */}
       {showAddExerciseModal && (
         <div
