@@ -47,7 +47,7 @@ export default function SchedulePage() {
 
   const handleTitleSave = () => {
     const trimmed = titleDraft.trim();
-    if (!trimmed) return; 
+    if (!trimmed) return;
     setScheduleTitle(trimmed);
     localStorage.setItem("scheduleTitle", trimmed);
     setIsEditingTitle(false);
@@ -60,9 +60,22 @@ export default function SchedulePage() {
 
   // Drag-and-drop state
   const [calendarExercises, setCalendarExercises] = useState<
-    Record<string, { id: string; exerciseId: string; name: string; notes: string }[]>
+    Record<string, { id: string; exerciseId: string; name: string; notes: string; intensity: "low" | "moderate" | "high"; duration: { hours: string; minutes: string } }[]>
   >({});
   const [dragOverDate, setDragOverDate] = useState<string | null>(null);
+
+  // Intensity & duration popup state
+  const [pendingDrop, setPendingDrop] = useState<{
+    exerciseId: string; name: string; notes: string; targetDateKey: string;
+  } | null>(null);
+  const [selectedIntensity, setSelectedIntensity] = useState<"low" | "moderate" | "high">("low");
+  const [durationHours, setDurationHours] = useState("");
+  const [durationMinutes, setDurationMinutes] = useState("");
+
+  // Editing state (null = adding new, object = editing existing)
+  const [editingItem, setEditingItem] = useState<{
+    itemId: string; dateKey: string;
+  } | null>(null);
 
   const getDateKey = (date: Date): string => {
     return date.toISOString().split("T")[0];
@@ -113,23 +126,17 @@ export default function SchedulePage() {
       const source = e.dataTransfer.getData("application/source");
 
       if (source === "sidebar") {
-        // Copy from sidebar
+        // Copy from sidebar — open intensity popup first
         const exerciseId = e.dataTransfer.getData("application/exercise-id");
         const exercise = exercises.find((ex) => ex.id === exerciseId);
         if (!exercise) return;
 
-        setCalendarExercises((prev) => ({
-          ...prev,
-          [targetDateKey]: [
-            ...(prev[targetDateKey] || []),
-            {
-              id: crypto.randomUUID(),
-              exerciseId: exercise.id,
-              name: exercise.name,
-              notes: exercise.notes,
-            },
-          ],
-        }));
+        setPendingDrop({
+          exerciseId: exercise.id,
+          name: exercise.name,
+          notes: exercise.notes,
+          targetDateKey,
+        });
       } else if (source === "calendar") {
         // Move between days
         const calendarItemId = e.dataTransfer.getData("application/calendar-item-id");
@@ -158,6 +165,60 @@ export default function SchedulePage() {
       [dateKey]: (prev[dateKey] || []).filter((i) => i.id !== itemId),
     }));
   }, []);
+
+  // Intensity & duration popup handlers
+  const handleDropSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      const duration = { hours: durationHours.trim(), minutes: durationMinutes.trim() };
+
+      if (editingItem) {
+        const { itemId, dateKey } = editingItem;
+        setCalendarExercises((prev) => ({
+          ...prev,
+          [dateKey]: (prev[dateKey] || []).map((i) =>
+            i.id === itemId ? { ...i, intensity: selectedIntensity, duration } : i
+          ),
+        }));
+        setEditingItem(null);
+        setPendingDrop(null);
+      } else if (pendingDrop) {
+        const { exerciseId, name, notes, targetDateKey } = pendingDrop;
+        setCalendarExercises((prev) => ({
+          ...prev,
+          [targetDateKey]: [
+            ...(prev[targetDateKey] || []),
+            { id: crypto.randomUUID(), exerciseId, name, notes, intensity: selectedIntensity, duration },
+          ],
+        }));
+        setPendingDrop(null);
+      }
+
+      setSelectedIntensity("low");
+      setDurationHours("");
+      setDurationMinutes("");
+    },
+    [pendingDrop, editingItem, selectedIntensity, durationHours, durationMinutes]
+  );
+
+  const handleIntensityCancel = useCallback(() => {
+    setPendingDrop(null);
+    setEditingItem(null);
+    setSelectedIntensity("low");
+    setDurationHours("");
+    setDurationMinutes("");
+  }, []);
+
+  const openEditPopup = useCallback(
+    (dateKey: string, item: { id: string; name: string; intensity: "low" | "moderate" | "high"; duration: { hours: string; minutes: string } }) => {
+      setEditingItem({ itemId: item.id, dateKey });
+      setPendingDrop({ exerciseId: "", name: item.name, notes: "", targetDateKey: dateKey });
+      setSelectedIntensity(item.intensity);
+      setDurationHours(item.duration.hours);
+      setDurationMinutes(item.duration.minutes);
+    },
+    []
+  );
 
   const openAddExerciseModal = () => {
     setExerciseName("");
@@ -313,45 +374,45 @@ export default function SchedulePage() {
         <div className="shrink-0 p-4 border-b border-white/15 bg-white/5 backdrop-blur-xl">
           <div className="flex flex-nowrap items-center justify-between gap-4 mb-4">
             <div className="flex min-w-0 shrink items-center gap-2">
-            {isEditingTitle ? (
-  <div className="flex items-center gap-2 min-w-0">
-    <input
-      autoFocus
-      type="text"
-      value={titleDraft}
-      onChange={(e) => setTitleDraft(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") handleTitleSave();
-        if (e.key === "Escape") {
-          if (scheduleTitle) { setTitleDraft(scheduleTitle); setIsEditingTitle(false); }
-        }
-      }}
-      onBlur={handleTitleSave}
-      placeholder="Name your schedule..."
-      className="text-2xl font-bold bg-transparent border-b-2 border-white/50 focus:border-white text-white placeholder-white/30 outline-none min-w-0 w-64"
-    />
-  </div>
-) : (
-  <>
-    <h1
-      className="truncate text-2xl font-bold text-white cursor-pointer hover:text-white/80 transition-colors"
-      onClick={() => { setTitleDraft(scheduleTitle); setIsEditingTitle(true); }}
-      title="Click to rename"
-    >
-      {scheduleTitle}
-    </h1>
-    <button
-      onClick={() => { setTitleDraft(scheduleTitle); setIsEditingTitle(true); }}
-      className="text-white/40 hover:text-white/80 transition-colors"
-      title="Rename schedule"
-    >
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-      </svg>
-    </button>
-  </>
-)}
+              {isEditingTitle ? (
+                <div className="flex items-center gap-2 min-w-0">
+                  <input
+                    autoFocus
+                    type="text"
+                    value={titleDraft}
+                    onChange={(e) => setTitleDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleTitleSave();
+                      if (e.key === "Escape") {
+                        if (scheduleTitle) { setTitleDraft(scheduleTitle); setIsEditingTitle(false); }
+                      }
+                    }}
+                    onBlur={handleTitleSave}
+                    placeholder="Name your schedule..."
+                    className="text-2xl font-bold bg-transparent border-b-2 border-white/50 focus:border-white text-white placeholder-white/30 outline-none min-w-0 w-64"
+                  />
+                </div>
+              ) : (
+                <>
+                  <h1
+                    className="truncate text-2xl font-bold text-white cursor-pointer hover:text-white/80 transition-colors"
+                    onClick={() => { setTitleDraft(scheduleTitle); setIsEditingTitle(true); }}
+                    title="Click to rename"
+                  >
+                    {scheduleTitle}
+                  </h1>
+                  <button
+                    onClick={() => { setTitleDraft(scheduleTitle); setIsEditingTitle(true); }}
+                    className="text-white/40 hover:text-white/80 transition-colors"
+                    title="Rename schedule"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                    </svg>
+                  </button>
+                </>
+              )}
             </div>
             <button
               type="button"
@@ -418,8 +479,8 @@ export default function SchedulePage() {
                       {/* Day Body - Drop Target */}
                       <div
                         className={`flex-1 overflow-y-auto p-2 min-h-[400px] transition-colors duration-200 ${dragOverDate === getDateKey(day)
-                            ? "bg-blue-500/15 ring-2 ring-inset ring-blue-400/50"
-                            : ""
+                          ? "bg-blue-500/15 ring-2 ring-inset ring-blue-400/50"
+                          : ""
                           }`}
                         onDragOver={(e) => handleDragOver(e, getDateKey(day))}
                         onDragLeave={handleDragLeave}
@@ -436,34 +497,74 @@ export default function SchedulePage() {
                           >
                             <div className="flex items-start justify-between gap-1">
                               <div className="min-w-0 flex-1">
-                                <p className="text-white font-medium text-xs leading-snug">
-                                  {item.name}
-                                </p>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <p className="text-white font-medium text-xs leading-snug">
+                                    {item.name}
+                                  </p>
+                                  <span
+                                    className={`shrink-0 inline-block rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none ${item.intensity === "low"
+                                      ? "bg-emerald-500/25 text-emerald-300 ring-1 ring-emerald-400/40"
+                                      : item.intensity === "moderate"
+                                        ? "bg-amber-500/25 text-amber-300 ring-1 ring-amber-400/40"
+                                        : "bg-red-500/25 text-red-300 ring-1 ring-red-400/40"
+                                      }`}
+                                  >
+                                    {item.intensity === "low" ? "L" : item.intensity === "moderate" ? "M" : "H"}
+                                  </span>
+                                  {(item.duration.hours || item.duration.minutes) && (
+                                    <span className="shrink-0 inline-block rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] font-medium leading-none text-white/70 ring-1 ring-white/15">
+                                      {item.duration.hours ? `${item.duration.hours}h` : ""}{item.duration.hours && item.duration.minutes ? " " : ""}{item.duration.minutes ? `${item.duration.minutes}m` : ""}
+                                    </span>
+                                  )}
+                                </div>
                                 {item.notes ? (
                                   <p className="text-white/60 text-[11px] mt-0.5 leading-snug">
                                     {item.notes}
                                   </p>
                                 ) : null}
                               </div>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  removeCalendarExercise(getDateKey(day), item.id)
-                                }
-                                className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 rounded p-0.5 hover:bg-red-500/30 text-white/50 hover:text-red-300"
-                                aria-label={`Remove ${item.name}`}
-                              >
-                                <svg
-                                  className="w-3.5 h-3.5"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2.5"
-                                  strokeLinecap="round"
+                              <div className="shrink-0 flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    openEditPopup(getDateKey(day), item)
+                                  }
+                                  className="rounded p-0.5 hover:bg-blue-500/30 text-white/50 hover:text-blue-300"
+                                  aria-label={`Edit ${item.name}`}
                                 >
-                                  <path d="M18 6L6 18M6 6l12 12" />
-                                </svg>
-                              </button>
+                                  <svg
+                                    className="w-3.5 h-3.5"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2.5"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  >
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                  </svg>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    removeCalendarExercise(getDateKey(day), item.id)
+                                  }
+                                  className="rounded p-0.5 hover:bg-red-500/30 text-white/50 hover:text-red-300"
+                                  aria-label={`Remove ${item.name}`}
+                                >
+                                  <svg
+                                    className="w-3.5 h-3.5"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2.5"
+                                    strokeLinecap="round"
+                                  >
+                                    <path d="M18 6L6 18M6 6l12 12" />
+                                  </svg>
+                                </button>
+                              </div>
                             </div>
                           </div>
                         ))}
@@ -481,6 +582,92 @@ export default function SchedulePage() {
           </div>
         </div>
       </div>
+
+      {/* Intensity & Duration Popup */}
+      {(pendingDrop || editingItem) && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={handleIntensityCancel}
+        >
+          <div
+            className="relative w-full max-w-sm rounded-2xl border border-white/15 bg-slate-900 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <form onSubmit={handleDropSubmit} className="p-6">
+              <h2 className="text-xl font-bold text-white mb-1">Exercise Details</h2>
+              <p className="text-white/50 text-sm mb-5">
+                Set intensity and duration for <span className="text-white font-medium">{pendingDrop?.name}</span>
+              </p>
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="drop-intensity" className="block text-sm font-medium text-white/80 mb-1">
+                    Intensity
+                  </label>
+                  <select
+                    id="drop-intensity"
+                    value={selectedIntensity}
+                    onChange={(e) => setSelectedIntensity(e.target.value as "low" | "moderate" | "high")}
+                    className="w-full rounded-lg bg-white/10 border border-white/15 text-white px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer"
+                  >
+                    <option value="low" className="bg-slate-900 text-white">🟢 Low</option>
+                    <option value="moderate" className="bg-slate-900 text-white">🟡 Moderate</option>
+                    <option value="high" className="bg-slate-900 text-white">🔴 High</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-white/80 mb-1">
+                    Duration
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1">
+                      <input
+                        id="drop-duration-hours"
+                        type="number"
+                        min="0"
+                        max="23"
+                        value={durationHours}
+                        onChange={(e) => setDurationHours(e.target.value.replace(/[^0-9]/g, ""))}
+                        placeholder="0"
+                        className="w-full rounded-lg bg-white/10 border border-white/15 text-white placeholder-white/40 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                      <span className="block text-[11px] text-white/40 mt-1 text-center">Hours</span>
+                    </div>
+                    <span className="text-white/50 font-bold text-lg pb-5">:</span>
+                    <div className="flex-1">
+                      <input
+                        id="drop-duration-minutes"
+                        type="number"
+                        min="0"
+                        max="59"
+                        value={durationMinutes}
+                        onChange={(e) => setDurationMinutes(e.target.value.replace(/[^0-9]/g, ""))}
+                        placeholder="0"
+                        className="w-full rounded-lg bg-white/10 border border-white/15 text-white placeholder-white/40 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                      <span className="block text-[11px] text-white/40 mt-1 text-center">Minutes</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-3 mt-5">
+                <button
+                  type="button"
+                  onClick={handleIntensityCancel}
+                  className="flex-1 rounded-lg border border-white/20 bg-white/5 text-white py-2.5 font-medium hover:bg-white/10 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white py-2.5 font-medium transition-colors"
+                >
+                  {editingItem ? "Update" : "Add"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Add Exercise Modal */}
       {showAddExerciseModal && (
