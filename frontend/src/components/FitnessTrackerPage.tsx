@@ -1,7 +1,10 @@
 import { useNavigate } from "react-router-dom";
+import { logout } from "../utils/auth";
 
 export default function FitnessTrackerPage() {
   const navigate = useNavigate();
+
+  const handleLogout = () => logout(navigate);
 
   return (
     <div className="min-h-screen w-full relative overflow-hidden bg-slate-950 flex items-center justify-center px-5 py-10">
@@ -21,7 +24,14 @@ export default function FitnessTrackerPage() {
 
       <div className="relative z-10 w-full max-w-5xl rounded-2xl border border-white/15 bg-white/10 backdrop-blur-xl shadow-[0_18px_60px_rgba(0,0,0,0.45)] overflow-hidden">
         {/* Header */}
-        <div className="py-10 text-center border-b border-white/15">
+        <div className="py-10 px-6 text-center border-b border-white/15 relative">
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="absolute right-4 top-1/2 -translate-y-1/2 z-10 rounded-lg border border-white/20 bg-white/5 px-4 py-2 text-sm font-medium text-white/90 hover:bg-white/10 hover:text-white cursor-pointer transition-colors"
+          >
+            Log out
+          </button>
           <h1 className="text-6xl font-extrabold tracking-wide text-white drop-shadow">
             Fitness Tracker
           </h1>
