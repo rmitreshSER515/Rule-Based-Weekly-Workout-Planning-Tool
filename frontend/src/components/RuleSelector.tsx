@@ -1,45 +1,40 @@
 import { useState, useEffect } from "react";
 import CreateRuleModal from "./CreateRuleModal";
+import { createRule, fetchRules, type RuleDto } from "../api/rules";
 
 interface RuleSelectorProps {
   isOpen: boolean;
   onClose: () => void;
-  onApplyRules?: (selectedRules: Rule[]) => void;
+  onApplyRules?: (selectedRules: RuleDto[]) => void;
   exercises: { id: string; name: string; notes: string }[];
+  userId: string | null;
 }
 
-interface Rule {
-  id: number;
-  name: string;
-  ifExercise: string;
-  ifActivityType: string;
-  ifTiming: string;
-  thenExercise: string;
-  thenActivityType: string;
-  thenRestriction: string;
-}
-
-export default function RuleSelector({ isOpen, onClose, onApplyRules, exercises }: RuleSelectorProps) {
+export default function RuleSelector({ isOpen, onClose, onApplyRules, exercises, userId }: RuleSelectorProps) {
   const [isCreateRuleOpen, setIsCreateRuleOpen] = useState(false);
-  const [selectedRuleIds, setSelectedRuleIds] = useState<number[]>([]);
-  const [rules, setRules] = useState<Rule[]>([]);
+  const [selectedRuleIds, setSelectedRuleIds] = useState<string[]>([]);
+  const [rules, setRules] = useState<RuleDto[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Fetch rules when modal opens
   useEffect(() => {
-    if (isOpen) {
-      fetchRules();
+    if (isOpen && userId) {
+      fetchRulesForUser();
     }
-  }, [isOpen]);
+  }, [isOpen, userId]);
 
-  const fetchRules = async () => {
+  const fetchRulesForUser = async () => {
+    if (!userId) {
+      setRules([]);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     try {
-      // TODO: Implement backend API call to fetch rules
-      
-      setRules([]);
+      const data = await fetchRules(userId);
+      setRules(data);
     } catch (err) {
       console.error("Error fetching rules:", err);
       setError(err instanceof Error ? err.message : "Failed to fetch rules");
@@ -49,14 +44,29 @@ export default function RuleSelector({ isOpen, onClose, onApplyRules, exercises 
     }
   };
 
-  const handleSaveRule = async (ruleData: any) => {
-    try {
-      // TODO: Implement backend API call to save rule
+  const handleSaveRule = async (ruleData: {
+    name: string;
+    ifExercise: string;
+    ifActivityType: string;
+    ifTiming: string;
+    thenExercise: string;
+    thenActivityType: string;
+    thenRestriction: string;
+  }) => {
+    if (!userId) {
+      alert("You must be logged in to create rules.");
+      return;
+    }
 
+    try {
+      await createRule({
+        userId,
+        ...ruleData,
+      });
 
       setIsCreateRuleOpen(false);
       // Refresh the rules list after successfully saving
-      await fetchRules();
+      await fetchRulesForUser();
     } catch (err) {
       console.error("Error saving rule:", err);
       // Optionally show error message to user
@@ -64,7 +74,7 @@ export default function RuleSelector({ isOpen, onClose, onApplyRules, exercises 
     }
   };
 
-  const toggleRuleSelection = (ruleId: number) => {
+  const toggleRuleSelection = (ruleId: string) => {
     setSelectedRuleIds((prev) =>
       prev.includes(ruleId)
         ? prev.filter((id) => id !== ruleId)

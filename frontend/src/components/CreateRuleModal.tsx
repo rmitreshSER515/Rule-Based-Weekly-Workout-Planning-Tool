@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 
 interface CreateRuleModalProps {
   isOpen: boolean;
@@ -18,18 +18,34 @@ interface RuleData {
 }
 
 const exercises = ["Hard", "Easy", "Medium"];
-const activityTypes = ["Running", "Biking", "Swimming", "Cycling"];
 const timings = ["the day before", "the day after", "the same day"];
 const restrictions = ["not allowed", "allowed"];
 
 export default function CreateRuleModal({ isOpen, onClose, onSave, exercisesFromSidebar }: CreateRuleModalProps) {
+  const firstSidebarExerciseName = useMemo(
+    () => (exercisesFromSidebar[0]?.name ?? ""),
+    [exercisesFromSidebar]
+  );
+
   const [ruleName, setRuleName] = useState("");
-  const [ifExercise, setIfExercise] = useState("Hard");
-  const [ifActivityType, setIfActivityType] = useState("Running");
-  const [ifTiming, setIfTiming] = useState("the day before");
-  const [thenExercise, setThenExercise] = useState("Hard");
-  const [thenActivityType, setThenActivityType] = useState("Biking");
-  const [thenRestriction, setThenRestriction] = useState("not allowed");
+  const [ifExercise, setIfExercise] = useState(exercises[0]);
+  const [ifActivityType, setIfActivityType] = useState(firstSidebarExerciseName);
+  const [ifTiming, setIfTiming] = useState(timings[0]);
+  const [thenExercise, setThenExercise] = useState(exercises[0]);
+  const [thenActivityType, setThenActivityType] = useState(firstSidebarExerciseName);
+  const [thenRestriction, setThenRestriction] = useState(restrictions[0]);
+
+  // When the list of sidebar exercises changes (or modal opens),
+  // keep the selected activity types in sync if they were empty.
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!ifActivityType && firstSidebarExerciseName) {
+      setIfActivityType(firstSidebarExerciseName);
+    }
+    if (!thenActivityType && firstSidebarExerciseName) {
+      setThenActivityType(firstSidebarExerciseName);
+    }
+  }, [isOpen, firstSidebarExerciseName]);
 
   const handleSave = () => {
     onSave({
@@ -46,12 +62,12 @@ export default function CreateRuleModal({ isOpen, onClose, onSave, exercisesFrom
 
   const resetForm = () => {
     setRuleName("");
-    setIfExercise("Hard");
-    setIfActivityType("Running");
-    setIfTiming("the day before");
-    setThenExercise("Hard");
-    setThenActivityType("Biking");
-    setThenRestriction("not allowed");
+    setIfExercise(exercises[0]);
+    setIfActivityType(firstSidebarExerciseName);
+    setIfTiming(timings[0]);
+    setThenExercise(exercises[0]);
+    setThenActivityType(firstSidebarExerciseName);
+    setThenRestriction(restrictions[0]);
   };
 
   const handleClose = () => {
