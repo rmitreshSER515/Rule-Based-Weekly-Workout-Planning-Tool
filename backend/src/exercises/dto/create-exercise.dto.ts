@@ -1,7 +1,4 @@
 import { IsNotEmpty, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
-const EXERCISE_NAME_REGEX = /^[a-zA-Z0-9\s\-']+$/;
-
-import { IsNotEmpty, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 
 const EXERCISE_NAME_REGEX = /^[a-zA-Z0-9\s\-']+$/;
 
