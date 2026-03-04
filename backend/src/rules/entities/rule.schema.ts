@@ -7,7 +7,33 @@ export type RuleDocument = HydratedDocument<Rule>;
 @Schema({ timestamps: true })
 export class Rule {
   @Prop({ required: true })
-  scheduleId: string;
+  userId: string;
+
+  // Optional schedule association for future use
+  @Prop()
+  scheduleId?: string;
+
+  // Human-readable metadata matching the UI
+  @Prop({ required: true, trim: true })
+  name: string;
+
+  @Prop({ required: true, trim: true })
+  ifExercise: string;
+
+  @Prop({ required: true, trim: true })
+  ifActivityType: string;
+
+  @Prop({ required: true, trim: true })
+  ifTiming: string;
+
+  @Prop({ required: true, trim: true })
+  thenExercise: string;
+
+  @Prop({ required: true, trim: true })
+  thenActivityType: string;
+
+  @Prop({ required: true, trim: true })
+  thenRestriction: string;
 
   @Prop({ type: Object, required: true })
   ifCondition: Condition;
