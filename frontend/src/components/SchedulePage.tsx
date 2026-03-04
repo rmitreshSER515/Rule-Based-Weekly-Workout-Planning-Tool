@@ -434,7 +434,7 @@ export default function SchedulePage() {
                   <div key={rule.id} className="p-2 rounded-lg bg-white/5 border border-white/10">
                     <p className="text-white font-medium text-sm truncate">{rule.name}</p>
                     <p className="text-white/50 text-xs truncate">
-                      If {rule.ifExercise} then {rule.thenActivityType} is {rule.thenRestriction}
+                      If {rule.ifExercise} {rule.ifActivityType} {rule.ifTiming}, then {rule.thenExercise} {rule.thenActivityType} is {rule.thenRestriction}
                     </p>
                   </div>
                 ))}
@@ -838,6 +838,7 @@ export default function SchedulePage() {
         onClose={() => setIsRuleSelectorOpen(false)}
         onApplyRules={handleApplyRules}
         exercises={exercises}
+        userId={userId}
       />
     </div>
   );
