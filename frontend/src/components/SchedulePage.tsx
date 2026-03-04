@@ -21,6 +21,9 @@ const formatDayName = (date: Date): string => {
   return `${dayName} ${day} ${month}`;
 };
 
+const EXERCISE_NAME_REGEX = /^[a-zA-Z0-9\s\-']+$/;
+const EXERCISE_NAME_MAX_LENGTH = 25;
+
 export default function SchedulePage() {
   const location = useLocation();
   const isCreateMode = (location.state as { mode?: string } | null)?.mode === "create";
@@ -57,6 +60,7 @@ export default function SchedulePage() {
   const [showAddExerciseModal, setShowAddExerciseModal] = useState(false);
   const [exerciseName, setExerciseName] = useState("");
   const [exerciseNotes, setExerciseNotes] = useState("");
+  const [addExerciseNameError, setAddExerciseNameError] = useState("");
   const [exercises, setExercises] = useState<{ id: string; name: string; notes: string }[]>([]);
 
   const [userId, setUserId] = useState<string | null>(null);
@@ -276,6 +280,7 @@ export default function SchedulePage() {
   const openAddExerciseModal = () => {
     setExerciseName("");
     setExerciseNotes("");
+    setAddExerciseNameError("");
     setShowAddExerciseModal(true);
   };
 
@@ -283,12 +288,31 @@ export default function SchedulePage() {
     setShowAddExerciseModal(false);
     setExerciseName("");
     setExerciseNotes("");
+    setAddExerciseNameError("");
   };
 
   const handleAddExerciseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const name = exerciseName.trim();
+    setAddExerciseNameError("");
+
     if (!name || !userId) return;
+
+    if (name.length > EXERCISE_NAME_MAX_LENGTH) {
+      setAddExerciseNameError(`Name must be ${EXERCISE_NAME_MAX_LENGTH} characters or fewer`);
+      return;
+    }
+    if (!EXERCISE_NAME_REGEX.test(name)) {
+      setAddExerciseNameError("Name can only contain letters, numbers, spaces, hyphens, and apostrophes");
+      return;
+    }
+    const isDuplicate = exercises.some(
+      (ex) => ex.name.trim().toLowerCase() === name.toLowerCase()
+    );
+    if (isDuplicate) {
+      setAddExerciseNameError("An exercise with this name already exists");
+      return;
+    }
 
     try {
       const created = await createExercise({
@@ -302,9 +326,8 @@ export default function SchedulePage() {
         { id: created.id, name: created.name, notes: created.notes },
       ]);
       closeAddExerciseModal();
-    } catch (err) {
-      console.error("Failed to create exercise", err);
-      // We could show a toast or inline error in a follow-up iteration
+    } catch (err: any) {
+      setAddExerciseNameError(err?.message ?? "Failed to create exercise");
     }
   };
 
@@ -750,17 +773,26 @@ export default function SchedulePage() {
               <form onSubmit={handleAddExerciseSubmit} className="space-y-4">
                 <div>
                   <label htmlFor="exercise-name" className="block text-sm font-medium text-white/80 mb-1">
-                    Name
+                    Name (max {EXERCISE_NAME_MAX_LENGTH} characters)
                   </label>
                   <input
                     id="exercise-name"
                     type="text"
                     value={exerciseName}
-                    onChange={(e) => setExerciseName(e.target.value)}
+                    onChange={(e) => {
+                      setExerciseName(e.target.value);
+                      if (addExerciseNameError) setAddExerciseNameError("");
+                    }}
                     placeholder="e.g. Running"
-                    className="w-full rounded-lg bg-white/10 border border-white/15 text-white placeholder-white/40 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    maxLength={EXERCISE_NAME_MAX_LENGTH}
+                    className={`w-full rounded-lg bg-white/10 border text-white placeholder-white/40 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      addExerciseNameError ? "border-red-400 focus:ring-red-500" : "border-white/15"
+                    }`}
                     autoFocus
                   />
+                  {addExerciseNameError && (
+                    <p className="text-red-400 text-xs mt-1.5">{addExerciseNameError}</p>
+                  )}
                 </div>
                 <div>
                   <label htmlFor="exercise-notes" className="block text-sm font-medium text-white/80 mb-1">
@@ -785,7 +817,11 @@ export default function SchedulePage() {
                   </button>
                   <button
                     type="submit"
-                    disabled={!exerciseName.trim()}
+                    disabled={
+                      !exerciseName.trim() ||
+                      exerciseName.trim().length > EXERCISE_NAME_MAX_LENGTH ||
+                      !EXERCISE_NAME_REGEX.test(exerciseName.trim())
+                    }
                     className="flex-1 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-2.5 font-medium"
                   >
                     Add
