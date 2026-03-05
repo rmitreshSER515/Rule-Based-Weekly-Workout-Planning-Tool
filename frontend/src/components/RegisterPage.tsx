@@ -196,7 +196,7 @@ export default function RegisterPage() {
       }
 
       // Redirect after success
-      navigate("/fitness");
+      navigate("/");
     } catch (error: any) {
       setErrors((prev) => ({
         ...prev,
