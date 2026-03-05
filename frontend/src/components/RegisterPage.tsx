@@ -48,6 +48,7 @@ export default function RegisterPage() {
       hasUpperCase: /[A-Z]/.test(password),
       hasLowerCase: /[a-z]/.test(password),
       hasNumber: /[0-9]/.test(password),
+      hasSymbol: /[^A-Za-z0-9]/.test(password),
     }),
     [password]
   );
@@ -413,6 +414,14 @@ export default function RegisterPage() {
                       One number
                     </span>
                   </div>
+                  <div className="flex items-center gap-2 text-xs">
+  <span className={passwordCriteria.hasSymbol ? "text-green-400" : "text-white/60"}>
+    {passwordCriteria.hasSymbol ? "✓" : "○"}
+  </span>
+  <span className={passwordCriteria.hasSymbol ? "text-white/90" : "text-white/60"}>
+    One symbol (!@#$...)
+  </span>
+</div>
                 </div>
               )}
 
