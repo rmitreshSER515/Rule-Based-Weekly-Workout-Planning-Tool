@@ -1,8 +1,9 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import RuleSelector from "./RuleSelector";
+import CreateRuleModal from "./CreateRuleModal";
 import { logout } from "../utils/auth";
 import { fetchExercises, createExercise, type ExerciseDto } from "../api/exercises";
+import { fetchRules, createRule, type RuleDto } from "../api/rules";
 
 const getDaysInRange = (startDate: Date, endDate: Date): Date[] => {
   const days: Date[] = [];
@@ -32,8 +33,9 @@ export default function SchedulePage() {
 
   const handleLogout = () => logout(navigate);
 
-  const [isRuleSelectorOpen, setIsRuleSelectorOpen] = useState(false);
-  const [selectedRules, setSelectedRules] = useState<any[]>([]);
+  const [rules, setRules] = useState<RuleDto[]>([]);
+  const [selectedRuleIds, setSelectedRuleIds] = useState<string[]>([]);
+  const [isCreateRuleOpen, setIsCreateRuleOpen] = useState(false);
 
   // Initialize dates for current week
   const today = new Date();
@@ -113,6 +115,33 @@ export default function SchedulePage() {
     };
 
     load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  // Load rules for this user
+  useEffect(() => {
+    if (!userId) {
+      setRules([]);
+      setSelectedRuleIds([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadRules = async () => {
+      try {
+        const items = await fetchRules(userId);
+        if (cancelled) return;
+        setRules(items);
+      } catch (err) {
+        console.error("Failed to load rules", err);
+      }
+    };
+
+    loadRules();
 
     return () => {
       cancelled = true;
@@ -364,8 +393,39 @@ export default function SchedulePage() {
     return result;
   }, [days]);
 
-  const handleApplyRules = (rules: any[]) => {
-    setSelectedRules(rules);
+  const selectedRules = useMemo(
+    () => rules.filter((rule) => selectedRuleIds.includes(rule.id)),
+    [rules, selectedRuleIds]
+  );
+
+  const toggleRuleSelection = (ruleId: string) => {
+    setSelectedRuleIds((prev) =>
+      prev.includes(ruleId) ? prev.filter((id) => id !== ruleId) : [...prev, ruleId]
+    );
+  };
+
+  const handleSaveRule = async (ruleData: {
+    name: string;
+    ifExercise: string;
+    ifActivityType: string;
+    ifTiming: string;
+    thenExercise: string;
+    thenActivityType: string;
+    thenRestriction: string;
+  }) => {
+    if (!userId) return;
+
+    try {
+      const created = await createRule({
+        userId,
+        ...ruleData,
+      });
+
+      setRules((prev) => [...prev, created]);
+      setIsCreateRuleOpen(false);
+    } catch (err) {
+      console.error("Failed to create rule", err);
+    }
   };
 
   return (
@@ -447,26 +507,37 @@ export default function SchedulePage() {
             </button>
           </div>
           <div className="flex-1 overflow-y-auto px-4 pb-4">
-            {selectedRules.length > 0 ? (
+            {rules.length > 0 ? (
               <div className="space-y-2">
-                {selectedRules.map((rule) => (
-                  <div key={rule.id} className="p-2 rounded-lg bg-white/5 border border-white/10">
-                    <p className="text-white font-medium text-sm truncate">{rule.name}</p>
-                    <p className="text-white/50 text-xs truncate">
-                      If {rule.ifExercise} {rule.ifActivityType} {rule.ifTiming}, then{" "}
-                      {rule.thenExercise} {rule.thenActivityType} is {rule.thenRestriction}
-                    </p>
-                  </div>
+                {rules.map((rule) => (
+                  <label
+                    key={rule.id}
+                    className="flex items-start gap-3 p-2 rounded-lg bg-white/5 border border-white/10 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedRuleIds.includes(rule.id)}
+                      onChange={() => toggleRuleSelection(rule.id)}
+                      className="mt-1 w-4 h-4 rounded border-white/30 bg-white/10 accent-teal-500 cursor-pointer"
+                    />
+                    <div className="min-w-0">
+                      <p className="text-white font-medium text-sm truncate">{rule.name}</p>
+                      <p className="text-white/50 text-xs truncate">
+                        If {rule.ifExercise} {rule.ifActivityType} {rule.ifTiming}, then{" "}
+                        {rule.thenExercise} {rule.thenActivityType} is {rule.thenRestriction}
+                      </p>
+                    </div>
+                  </label>
                 ))}
               </div>
             ) : (
-              <p className="text-white/50 text-sm">No rules selected</p>
+              <p className="text-white/50 text-sm">No rules yet. Add one to get started.</p>
             )}
           </div>
           <div className="shrink-0 p-4 pt-0">
             <button
               type="button"
-              onClick={() => setIsRuleSelectorOpen(true)}
+              onClick={() => setIsCreateRuleOpen(true)}
               className="w-full rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 px-4 text-center flex items-center justify-center gap-2"
               aria-label="Add rule"
             >
@@ -924,14 +995,15 @@ export default function SchedulePage() {
         </div>
       )}
 
-      {/* Rule Selector Modal */}
-      <RuleSelector
-        isOpen={isRuleSelectorOpen}
-        onClose={() => setIsRuleSelectorOpen(false)}
-        onApplyRules={handleApplyRules}
-        exercises={exercises}
-        userId={userId}
-      />
+      {/* Create Rule Modal */}
+      {isCreateRuleOpen && (
+        <CreateRuleModal
+          isOpen={isCreateRuleOpen}
+          onClose={() => setIsCreateRuleOpen(false)}
+          onSave={handleSaveRule}
+          exercisesFromSidebar={exercises}
+        />
+      )}
     </div>
   );
 }
