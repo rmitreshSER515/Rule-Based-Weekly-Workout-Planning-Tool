@@ -26,6 +26,70 @@ const formatDayName = (date: Date): string => {
 const EXERCISE_NAME_REGEX = /^[a-zA-Z0-9\s\-']+$/;
 const EXERCISE_NAME_MAX_LENGTH = 25;
 
+// Map rule intensity (Hard/Easy/Medium) to calendar intensity
+const RULE_INTENSITY_TO_CALENDAR: Record<string, "low" | "moderate" | "high"> = {
+  Easy: "low",
+  Medium: "moderate",
+  Hard: "high",
+};
+
+function addDaysToDateKey(dateKey: string, days: number): string {
+  const d = new Date(dateKey + "T12:00:00");
+  d.setDate(d.getDate() + days);
+  return d.toISOString().split("T")[0];
+}
+
+type CalendarItem = {
+  id: string;
+  exerciseId: string;
+  name: string;
+  notes: string;
+  intensity: "low" | "moderate" | "high";
+  duration: { hours: string; minutes: string };
+};
+
+/**
+ * Returns the first rule that would be violated by placing the given exercise
+ * on the target date. Only considers selected rules with thenRestriction "not allowed".
+ * If intensity is provided, also matches thenExercise (rule intensity); otherwise name-only.
+ */
+function getViolatedRule(
+  exerciseName: string,
+  intensity: "low" | "moderate" | "high" | null,
+  targetDateKey: string,
+  calendarExercises: Record<string, CalendarItem[]>,
+  selectedRules: RuleDto[]
+): RuleDto | null {
+  const notAllowedRules = selectedRules.filter(
+    (r) => r.thenRestriction === "not allowed" && r.thenActivityType === exerciseName
+  );
+  for (const rule of notAllowedRules) {
+    if (intensity != null) {
+      const ruleThenIntensity = RULE_INTENSITY_TO_CALENDAR[rule.thenExercise];
+      if (ruleThenIntensity != null && ruleThenIntensity !== intensity) continue;
+    }
+    let checkDateKey: string;
+    if (rule.ifTiming === "the same day") {
+      checkDateKey = targetDateKey;
+    } else if (rule.ifTiming === "the day after") {
+      checkDateKey = addDaysToDateKey(targetDateKey, 1);
+    } else if (rule.ifTiming === "the day before") {
+      checkDateKey = addDaysToDateKey(targetDateKey, -1);
+    } else {
+      continue;
+    }
+    const itemsOnDay = calendarExercises[checkDateKey] || [];
+    const ruleIfIntensity = RULE_INTENSITY_TO_CALENDAR[rule.ifExercise];
+    const hasTrigger = itemsOnDay.some((item) => {
+      if (item.name !== rule.ifActivityType) return false;
+      if (ruleIfIntensity != null && item.intensity !== ruleIfIntensity) return false;
+      return true;
+    });
+    if (hasTrigger) return rule;
+  }
+  return null;
+}
+
 export default function SchedulePage() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -223,10 +287,31 @@ export default function SchedulePage() {
       const source = e.dataTransfer.getData("application/source");
 
       if (source === "sidebar") {
-        // Copy from sidebar — open intensity popup first
+        // Copy from sidebar — check rules first, then open intensity popup
         const exerciseId = e.dataTransfer.getData("application/exercise-id");
         const exercise = exercises.find((ex) => ex.id === exerciseId);
         if (!exercise) return;
+
+        const selectedRulesList = rules.filter((r) => selectedRuleIds.includes(r.id));
+        const violated = getViolatedRule(
+          exercise.name,
+          null,
+          targetDateKey,
+          calendarExercises,
+          selectedRulesList
+        );
+        if (violated) {
+          const trigger =
+            violated.ifTiming === "the same day"
+              ? "on this day"
+              : violated.ifTiming === "the day after"
+              ? "the day after"
+              : "the day before";
+          alert(
+            `Rule "${violated.name}": If ${violated.ifExercise} ${violated.ifActivityType} occurs ${violated.ifTiming}, then ${violated.thenExercise} ${violated.thenActivityType} is not allowed. ${violated.ifActivityType} is already scheduled ${trigger}.`
+          );
+          return;
+        }
 
         setPendingDrop({
           exerciseId: exercise.id,
@@ -235,25 +320,50 @@ export default function SchedulePage() {
           targetDateKey,
         });
       } else if (source === "calendar") {
-        // Move between days
+        // Move between days — check rules before moving
         const calendarItemId = e.dataTransfer.getData("application/calendar-item-id");
         const sourceDate = e.dataTransfer.getData("application/source-date");
         if (sourceDate === targetDateKey) return; // dropped on same day
 
+        const sourceItems = calendarExercises[sourceDate] || [];
+        const item = sourceItems.find((i) => i.id === calendarItemId);
+        if (!item) return;
+
+        const selectedRulesList = rules.filter((r) => selectedRuleIds.includes(r.id));
+        const violated = getViolatedRule(
+          item.name,
+          item.intensity,
+          targetDateKey,
+          calendarExercises,
+          selectedRulesList
+        );
+        if (violated) {
+          const trigger =
+            violated.ifTiming === "the same day"
+              ? "on that day"
+              : violated.ifTiming === "the day after"
+              ? "the day after"
+              : "the day before";
+          alert(
+            `Rule "${violated.name}": If ${violated.ifExercise} ${violated.ifActivityType} occurs ${violated.ifTiming}, then ${violated.thenExercise} ${violated.thenActivityType} is not allowed. ${violated.ifActivityType} is already scheduled ${trigger}.`
+          );
+          return;
+        }
+
         setCalendarExercises((prev) => {
-          const sourceItems = prev[sourceDate] || [];
-          const item = sourceItems.find((i) => i.id === calendarItemId);
-          if (!item) return prev;
+          const srcItems = prev[sourceDate] || [];
+          const movedItem = srcItems.find((i) => i.id === calendarItemId);
+          if (!movedItem) return prev;
 
           return {
             ...prev,
-            [sourceDate]: sourceItems.filter((i) => i.id !== calendarItemId),
-            [targetDateKey]: [...(prev[targetDateKey] || []), item],
+            [sourceDate]: srcItems.filter((i) => i.id !== calendarItemId),
+            [targetDateKey]: [...(prev[targetDateKey] || []), movedItem],
           };
         });
       }
     },
-    [exercises]
+    [exercises, rules, selectedRuleIds, calendarExercises]
   );
 
   const removeCalendarExercise = useCallback((dateKey: string, itemId: string) => {
@@ -271,6 +381,31 @@ export default function SchedulePage() {
 
       if (editingItem) {
         const { itemId, dateKey } = editingItem;
+        const selectedRulesList = rules.filter((r) => selectedRuleIds.includes(r.id));
+        const existingItems = calendarExercises[dateKey] || [];
+        const existingItem = existingItems.find((i) => i.id === itemId);
+        // Use hypothetical calendar with this item's new intensity for rule check
+        const calendarWithEdit: Record<string, CalendarItem[]> = {
+          ...calendarExercises,
+          [dateKey]: existingItems.map((i) =>
+            i.id === itemId ? { ...i, intensity: selectedIntensity } : i
+          ),
+        };
+        const violatedEdit =
+          existingItem &&
+          getViolatedRule(
+            existingItem.name,
+            selectedIntensity,
+            dateKey,
+            calendarWithEdit,
+            selectedRulesList
+          );
+        if (violatedEdit) {
+          alert(
+            `Rule "${violatedEdit.name}": If ${violatedEdit.ifExercise} ${violatedEdit.ifActivityType} occurs ${violatedEdit.ifTiming}, then ${violatedEdit.thenExercise} ${violatedEdit.thenActivityType} is not allowed.`
+          );
+          return;
+        }
         setCalendarExercises((prev) => ({
           ...prev,
           [dateKey]: (prev[dateKey] || []).map((i) =>
@@ -281,6 +416,20 @@ export default function SchedulePage() {
         setPendingDrop(null);
       } else if (pendingDrop) {
         const { exerciseId, name, notes, targetDateKey } = pendingDrop;
+        const selectedRulesList = rules.filter((r) => selectedRuleIds.includes(r.id));
+        const violated = getViolatedRule(
+          name,
+          selectedIntensity,
+          targetDateKey,
+          calendarExercises,
+          selectedRulesList
+        );
+        if (violated) {
+          alert(
+            `Rule "${violated.name}": If ${violated.ifExercise} ${violated.ifActivityType} occurs ${violated.ifTiming}, then ${violated.thenExercise} ${violated.thenActivityType} is not allowed. Choose a different intensity or day.`
+          );
+          return;
+        }
         setCalendarExercises((prev) => ({
           ...prev,
           [targetDateKey]: [
@@ -295,7 +444,16 @@ export default function SchedulePage() {
       setDurationHours("");
       setDurationMinutes("");
     },
-    [pendingDrop, editingItem, selectedIntensity, durationHours, durationMinutes]
+    [
+      pendingDrop,
+      editingItem,
+      selectedIntensity,
+      durationHours,
+      durationMinutes,
+      rules,
+      selectedRuleIds,
+      calendarExercises,
+    ]
   );
 
   const handleIntensityCancel = useCallback(() => {
