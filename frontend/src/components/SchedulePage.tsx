@@ -453,7 +453,7 @@ export default function SchedulePage() {
             </button>
           </div>
           <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-2">
-            {exercises.map((ex) => (
+            {exercises.length > 0 ? exercises.map((ex) => (
               <div
                 key={ex.id}
                 draggable
@@ -482,7 +482,9 @@ export default function SchedulePage() {
                   </div>
                 </div>
               </div>
-            ))}
+            )) : (
+              <p className="text-white/50 text-sm">No exercises yet. Add one to get started.</p>
+            )}
           </div>
           <div className="shrink-0 p-4 pt-0">
             <button
@@ -693,11 +695,10 @@ export default function SchedulePage() {
                       </div>
                       {/* Day Body - Drop Target */}
                       <div
-                        className={`flex-1 overflow-y-auto p-2 min-h-[400px] transition-colors duration-200 ${
-                          dragOverDate === getDateKey(day)
-                            ? "bg-blue-500/15 ring-2 ring-inset ring-blue-400/50"
-                            : ""
-                        }`}
+                        className={`flex-1 overflow-y-auto p-2 min-h-[400px] transition-colors duration-200 ${dragOverDate === getDateKey(day)
+                          ? "bg-blue-500/15 ring-2 ring-inset ring-blue-400/50"
+                          : ""
+                          }`}
                         onDragOver={(e) => handleDragOver(e, getDateKey(day))}
                         onDragLeave={handleDragLeave}
                         onDrop={(e) => handleDrop(e, getDateKey(day))}
@@ -718,19 +719,18 @@ export default function SchedulePage() {
                                     {item.name}
                                   </p>
                                   <span
-                                    className={`shrink-0 inline-block rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none ${
-                                      item.intensity === "low"
-                                        ? "bg-emerald-500/25 text-emerald-300 ring-1 ring-emerald-400/40"
-                                        : item.intensity === "moderate"
+                                    className={`shrink-0 inline-block rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none ${item.intensity === "low"
+                                      ? "bg-emerald-500/25 text-emerald-300 ring-1 ring-emerald-400/40"
+                                      : item.intensity === "moderate"
                                         ? "bg-amber-500/25 text-amber-300 ring-1 ring-amber-400/40"
                                         : "bg-red-500/25 text-red-300 ring-1 ring-red-400/40"
-                                    }`}
+                                      }`}
                                   >
                                     {item.intensity === "low"
                                       ? "L"
                                       : item.intensity === "moderate"
-                                      ? "M"
-                                      : "H"}
+                                        ? "M"
+                                        : "H"}
                                   </span>
                                   {(item.duration.hours || item.duration.minutes) && (
                                     <span className="shrink-0 inline-block rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] font-medium leading-none text-white/70 ring-1 ring-white/15">
@@ -942,11 +942,10 @@ export default function SchedulePage() {
                     }}
                     placeholder="e.g. Running"
                     maxLength={EXERCISE_NAME_MAX_LENGTH}
-                    className={`w-full rounded-lg bg-white/10 border text-white placeholder-white/40 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      addExerciseNameError
-                        ? "border-red-400 focus:ring-red-500"
-                        : "border-white/15"
-                    }`}
+                    className={`w-full rounded-lg bg-white/10 border text-white placeholder-white/40 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${addExerciseNameError
+                      ? "border-red-400 focus:ring-red-500"
+                      : "border-white/15"
+                      }`}
                     autoFocus
                   />
                   {addExerciseNameError && (
