@@ -228,7 +228,9 @@ export default function LoginPage() {
                 type="button"
                 className="text-white/75 hover:text-white underline underline-offset-4"
               >
-                Forgot password?
+                <Link to="/forgot-password" className="text-white/75 hover:text-white underline underline-offset-4">
+  Forgot password?
+</Link>
               </button>
             </div>
 

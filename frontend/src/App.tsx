@@ -3,6 +3,7 @@ import LoginPage from "./components/LoginPage";
 import FitnessTrackerPage from "./components/FitnessTrackerPage";
 import SchedulePage from "./components/SchedulePage";
 import RegisterPage from "./components/RegisterPage";
+import ForgotPasswordPage from "./components/Forgotpasswordpage";
 
 export default function App() {
   return (
@@ -13,6 +14,7 @@ export default function App() {
       <Route path="/fitness" element={<FitnessTrackerPage />} />
       <Route path="/schedules" element={<SchedulePage />} />
       <Route path="*" element={<Navigate to="/login" replace />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
     </Routes>
   );
 }
