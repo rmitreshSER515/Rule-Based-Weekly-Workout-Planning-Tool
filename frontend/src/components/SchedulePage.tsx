@@ -458,7 +458,7 @@ export default function SchedulePage() {
                 key={ex.id}
                 draggable
                 onDragStart={(e) => handleSidebarDragStart(e, ex)}
-                className="rounded-lg bg-blue-500/20 border border-blue-400/30 px-3 py-2 cursor-grab active:cursor-grabbing select-none transition-all duration-150 hover:bg-blue-500/30 hover:border-blue-400/50 hover:shadow-lg hover:shadow-blue-500/10"
+                className="rounded-lg bg-orange-500/20 border border-orange-400/30 px-3 py-2 cursor-grab active:cursor-grabbing select-none transition-all duration-150 hover:bg-orange-500/30 hover:border-orange-400/50 hover:shadow-lg hover:shadow-orange-500/10"
               >
                 <div className="flex items-start gap-2">
                   {/* Grip handle */}
@@ -709,7 +709,7 @@ export default function SchedulePage() {
                             onDragStart={(e) =>
                               handleCalendarDragStart(e, item.id, getDateKey(day))
                             }
-                            className="mb-2 rounded-lg bg-blue-500/20 border border-blue-400/30 px-2.5 py-1.5 cursor-grab active:cursor-grabbing select-none group transition-all duration-150 hover:bg-blue-500/30 hover:border-blue-400/50"
+                            className="mb-2 rounded-lg bg-orange-500/20 border border-orange-400/30 px-2.5 py-1.5 cursor-grab active:cursor-grabbing select-none group transition-all duration-150 hover:bg-orange-500/30 hover:border-orange-400/50"
                           >
                             <div className="flex items-start justify-between gap-1">
                               <div className="min-w-0 flex-1">
