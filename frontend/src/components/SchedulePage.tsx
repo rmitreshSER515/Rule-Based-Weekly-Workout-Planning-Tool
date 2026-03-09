@@ -4,6 +4,7 @@ import CreateRuleModal from "./CreateRuleModal";
 import { logout } from "../utils/auth";
 import { fetchExercises, createExercise, type ExerciseDto } from "../api/exercises";
 import { fetchRules, createRule, type RuleDto } from "../api/rules";
+import { getExerciseIcon } from "../utils/exerciseIcons";
 
 const getDaysInRange = (startDate: Date, endDate: Date): Date[] => {
   const days: Date[] = [];
@@ -474,6 +475,9 @@ export default function SchedulePage() {
                     <circle cx="9" cy="19" r="1.5" />
                     <circle cx="15" cy="19" r="1.5" />
                   </svg>
+                  <span className="w-5 h-5 mt-0.5 text-white/80">
+                    {getExerciseIcon(ex.name, "20")}
+                  </span>
                   <div className="min-w-0">
                     <p className="text-white font-medium text-sm">{ex.name}</p>
                     {ex.notes ? (
@@ -693,11 +697,10 @@ export default function SchedulePage() {
                       </div>
                       {/* Day Body - Drop Target */}
                       <div
-                        className={`flex-1 overflow-y-auto p-2 min-h-[400px] transition-colors duration-200 ${
-                          dragOverDate === getDateKey(day)
+                        className={`flex-1 overflow-y-auto p-2 min-h-[400px] transition-colors duration-200 ${dragOverDate === getDateKey(day)
                             ? "bg-blue-500/15 ring-2 ring-inset ring-blue-400/50"
                             : ""
-                        }`}
+                          }`}
                         onDragOver={(e) => handleDragOver(e, getDateKey(day))}
                         onDragLeave={handleDragLeave}
                         onDrop={(e) => handleDrop(e, getDateKey(day))}
@@ -714,23 +717,25 @@ export default function SchedulePage() {
                             <div className="flex items-start justify-between gap-1">
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="w-4 h-4 text-white/80">
+                                    {getExerciseIcon(item.name, "16")}
+                                  </span>
                                   <p className="text-white font-medium text-xs leading-snug">
                                     {item.name}
                                   </p>
                                   <span
-                                    className={`shrink-0 inline-block rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none ${
-                                      item.intensity === "low"
+                                    className={`shrink-0 inline-block rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none ${item.intensity === "low"
                                         ? "bg-emerald-500/25 text-emerald-300 ring-1 ring-emerald-400/40"
                                         : item.intensity === "moderate"
-                                        ? "bg-amber-500/25 text-amber-300 ring-1 ring-amber-400/40"
-                                        : "bg-red-500/25 text-red-300 ring-1 ring-red-400/40"
-                                    }`}
+                                          ? "bg-amber-500/25 text-amber-300 ring-1 ring-amber-400/40"
+                                          : "bg-red-500/25 text-red-300 ring-1 ring-red-400/40"
+                                      }`}
                                   >
                                     {item.intensity === "low"
                                       ? "L"
                                       : item.intensity === "moderate"
-                                      ? "M"
-                                      : "H"}
+                                        ? "M"
+                                        : "H"}
                                   </span>
                                   {(item.duration.hours || item.duration.minutes) && (
                                     <span className="shrink-0 inline-block rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] font-medium leading-none text-white/70 ring-1 ring-white/15">
@@ -942,11 +947,10 @@ export default function SchedulePage() {
                     }}
                     placeholder="e.g. Running"
                     maxLength={EXERCISE_NAME_MAX_LENGTH}
-                    className={`w-full rounded-lg bg-white/10 border text-white placeholder-white/40 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      addExerciseNameError
+                    className={`w-full rounded-lg bg-white/10 border text-white placeholder-white/40 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${addExerciseNameError
                         ? "border-red-400 focus:ring-red-500"
                         : "border-white/15"
-                    }`}
+                      }`}
                     autoFocus
                   />
                   {addExerciseNameError && (
