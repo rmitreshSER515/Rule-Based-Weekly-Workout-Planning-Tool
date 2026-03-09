@@ -1,59 +1,80 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import CreateRuleModal from "./CreateRuleModal";
+import { createRule, fetchRules, type RuleDto } from "../api/rules";
 
 interface RuleSelectorProps {
   isOpen: boolean;
   onClose: () => void;
-  onApplyRules?: (selectedRules: Rule[]) => void;
+  onApplyRules?: (selectedRules: RuleDto[]) => void;
+  exercises: { id: string; name: string; notes: string }[];
+  userId: string | null;
 }
 
-interface Rule {
-  id: number;
-  name: string;
-  ifExercise: string;
-  ifActivityType: string;
-  ifTiming: string;
-  thenExercise: string;
-  thenActivityType: string;
-  thenRestriction: string;
-}
-
-export default function RuleSelector({ isOpen, onClose, onApplyRules }: RuleSelectorProps) {
+export default function RuleSelector({ isOpen, onClose, onApplyRules, exercises, userId }: RuleSelectorProps) {
   const [isCreateRuleOpen, setIsCreateRuleOpen] = useState(false);
-  const [selectedRuleIds, setSelectedRuleIds] = useState<number[]>([]);
-  const [rules, setRules] = useState<Rule[]>([
-    {
-      id: 1,
-      name: "Marathon_Rule",
-      ifExercise: "Hard",
-      ifActivityType: "Running",
-      ifTiming: "the day before",
-      thenExercise: "Easy",
-      thenActivityType: "Biking",
-      thenRestriction: "not allowed",
-    },
-    {
-      id: 2,
-      name: "Triathlon_Rule",
-      ifExercise: "Medium",
-      ifActivityType: "Swimming",
-      ifTiming: "the day after",
-      thenExercise: "Hard",
-      thenActivityType: "Running",
-      thenRestriction: "allowed",
-    },
-  ]);
+  const [selectedRuleIds, setSelectedRuleIds] = useState<string[]>([]);
+  const [rules, setRules] = useState<RuleDto[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSaveRule = (ruleData: any) => {
-    const newRule: Rule = {
-      id: rules.length + 1,
-      ...ruleData,
-    };
-    setRules([...rules, newRule]);
-    setIsCreateRuleOpen(false);
+  // Fetch rules when modal opens
+  useEffect(() => {
+    if (isOpen && userId) {
+      fetchRulesForUser();
+    }
+  }, [isOpen, userId]);
+
+  const fetchRulesForUser = async () => {
+    if (!userId) {
+      setRules([]);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await fetchRules(userId);
+      setRules(data);
+    } catch (err) {
+      console.error("Error fetching rules:", err);
+      setError(err instanceof Error ? err.message : "Failed to fetch rules");
+      setRules([]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const toggleRuleSelection = (ruleId: number) => {
+  const handleSaveRule = async (ruleData: {
+    name: string;
+    ifExercise: string;
+    ifActivityType: string;
+    ifTiming: string;
+    thenExercise: string;
+    thenActivityType: string;
+    thenRestriction: string;
+  }) => {
+    if (!userId) {
+      alert("You must be logged in to create rules.");
+      return;
+    }
+
+    try {
+      await createRule({
+        userId,
+        ...ruleData,
+      });
+
+      setIsCreateRuleOpen(false);
+      // Refresh the rules list after successfully saving
+      await fetchRulesForUser();
+    } catch (err) {
+      console.error("Error saving rule:", err);
+      // Optionally show error message to user
+      alert("Failed to save rule. Please try again.");
+    }
+  };
+
+  const toggleRuleSelection = (ruleId: string) => {
     setSelectedRuleIds((prev) =>
       prev.includes(ruleId)
         ? prev.filter((id) => id !== ruleId)
@@ -62,6 +83,7 @@ export default function RuleSelector({ isOpen, onClose, onApplyRules }: RuleSele
   };
 
   const handleApplyRules = () => {
+    if (selectedRuleIds.length === 0) return;
     const selected = rules.filter((rule) => selectedRuleIds.includes(rule.id));
     onApplyRules?.(selected);
     onClose();
@@ -103,45 +125,64 @@ export default function RuleSelector({ isOpen, onClose, onApplyRules }: RuleSele
 
               {/* Rules List */}
               <div className="flex-1 overflow-y-auto mb-6 pr-4">
-                <div className="space-y-2">
-                  {rules.map((rule, index) => (
-                    <div
-                      key={rule.id}
-                      className="flex items-center gap-4 p-4 rounded-lg bg-white/5 border border-white/10 hover:bg-white/8 transition-colors cursor-pointer"
-                      onClick={() => toggleRuleSelection(rule.id)}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedRuleIds.includes(rule.id)}
-                        onChange={() => toggleRuleSelection(rule.id)}
-                        className="flex-shrink-0 w-5 h-5 rounded border-white/30 bg-white/10 accent-teal-500 cursor-pointer"
-                        aria-label={`Select ${rule.name}`}
-                      />
-                      <div className="flex items-center gap-4 flex-1 min-w-0">
-                        <span className="text-white/70 font-medium flex-shrink-0">
-                          {rules.findIndex((r) => r.id === rule.id) + 1}.
-                        </span>
-                        <div className="min-w-0">
-                          <p className="text-white font-medium truncate">
-                            {rule.name}
-                          </p>
-                          <p className="text-white/50 text-sm truncate">
-                            If {rule.ifExercise} {rule.ifActivityType}
-                            {" "}{rule.ifTiming}, then {rule.thenExercise}{" "}
-                            {rule.thenActivityType} is {rule.thenRestriction}
-                          </p>
+                {isLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <p className="text-white/70">Loading rules...</p>
+                  </div>
+                ) : error ? (
+                  <div className="flex items-center justify-center h-full">
+                    <p className="text-red-400/80">{error}</p>
+                  </div>
+                ) : rules.length === 0 ? (
+                  <div className="flex items-center justify-center h-full">
+                    <p className="text-white/50">No rules available. Create one to get started.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {rules.map((rule, index) => (
+                      <div
+                        key={rule.id}
+                        className="flex items-center gap-4 p-4 rounded-lg bg-white/5 border border-white/10 hover:bg-white/8 transition-colors cursor-pointer"
+                        onClick={() => toggleRuleSelection(rule.id)}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedRuleIds.includes(rule.id)}
+                          onChange={() => toggleRuleSelection(rule.id)}
+                          className="flex-shrink-0 w-5 h-5 rounded border-white/30 bg-white/10 accent-teal-500 cursor-pointer"
+                          aria-label={`Select ${rule.name}`}
+                        />
+                        <div className="flex items-center gap-4 flex-1 min-w-0">
+                          <span className="text-white/70 font-medium flex-shrink-0">
+                            {rules.findIndex((r) => r.id === rule.id) + 1}.
+                          </span>
+                          <div className="min-w-0">
+                            <p className="text-white font-medium truncate">
+                              {rule.name}
+                            </p>
+                            <p className="text-white/50 text-sm truncate">
+                              If {rule.ifExercise} {rule.ifActivityType}
+                              {" "}{rule.ifTiming}, then {rule.thenExercise}{" "}
+                              {rule.thenActivityType} is {rule.thenRestriction}
+                            </p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Create New Rule Button */}
               <div className="pt-6 border-t border-white/10 space-y-3">
                 <button
                   onClick={handleApplyRules}
-                  className="w-full rounded-lg bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:shadow-lg hover:shadow-emerald-500/40 text-white font-semibold py-3 px-4 transition-all hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-slate-950"
+                  disabled={selectedRuleIds.length === 0}
+                  className={`w-full rounded-lg font-semibold py-3 px-4 transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-950 ${
+                    selectedRuleIds.length === 0
+                      ? "bg-slate-600/60 text-white/40 cursor-not-allowed"
+                      : "bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:shadow-lg hover:shadow-emerald-500/40 text-white hover:scale-[1.02] active:scale-[0.98] focus:ring-emerald-400"
+                  }`}
                 >
                   Apply Selected Rules
                 </button>
@@ -162,6 +203,7 @@ export default function RuleSelector({ isOpen, onClose, onApplyRules }: RuleSele
         isOpen={isCreateRuleOpen}
         onClose={() => setIsCreateRuleOpen(false)}
         onSave={handleSaveRule}
+        exercisesFromSidebar={exercises}
       />
     </>
   );

@@ -61,9 +61,6 @@ export class AuthService {
     if (!emailRegex.test(normalizedEmail)) {
       throw new BadRequestException('Invalid email');
     }
-    if (!passwordRuleOk(password || '')) {
-      throw new BadRequestException('Password must include 1 uppercase, 1 digit, and 1 symbol');
-    }
 
     const user = await this.users.validateUser(normalizedEmail, password);
     if (!user) {

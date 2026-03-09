@@ -13,14 +13,7 @@ export default function LoginPage() {
   const [touched, setTouched] = useState({ email: false, password: false });
   const navigate = useNavigate();
 
-  const passwordCriteria = {
-    minLength: password.length >= 6,
-    hasUpperCase: /[A-Z]/.test(password),
-    hasLowerCase: /[a-z]/.test(password),
-    hasNumber: /[0-9]/.test(password),
-  };
-
-  const allCriteriaMet = Object.values(passwordCriteria).every(Boolean);
+  
 
   useEffect(() => {
     if (touched.email && emailOrUser) {
@@ -35,27 +28,17 @@ export default function LoginPage() {
     }
   }, [emailOrUser, touched.email]);
 
-  useEffect(() => {
-    if (touched.password && password) {
-      if (!allCriteriaMet) {
-        setPasswordError("Password doesn't meet all requirements");
-      } else {
-        setPasswordError("");
-      }
-    }
-  }, [password, touched.password, allCriteriaMet]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
- 
+
     setTouched({ email: true, password: true });
-    
+
     setEmailError("");
     setPasswordError("");
-    
+
     let hasError = false;
-    
+
     if (!emailOrUser.trim()) {
       setEmailError("Email address is required");
       hasError = true;
@@ -66,32 +49,56 @@ export default function LoginPage() {
         hasError = true;
       }
     }
-    
+
     if (!password) {
       setPasswordError("Password is required");
       hasError = true;
-    } else if (!allCriteriaMet) {
-      setPasswordError("Password doesn't meet all requirements");
-      hasError = true;
-    }
-    
+    } 
+
     if (hasError) return;
-    
-    setIsLoading(true);
-    console.log({ emailOrUser, password, remember });
-    
-    setTimeout(() => {
-      setIsLoading(false);
+
+    try {
+      setIsLoading(true);
+      const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
+
+      const response = await fetch(`${API_URL}/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: emailOrUser.trim(),
+          password,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Login failed");
+      }
+
+      if (data.accessToken) {
+        localStorage.setItem("token", data.accessToken);
+      }
+      if (data.user) {
+        localStorage.setItem("user", JSON.stringify(data.user));
+      }
+
       navigate("/fitness");
-    }, 2000);
+    } catch (err: any) {
+      const msg = err?.message || "Login failed";
+      setPasswordError(msg);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const isFormValid = 
-    emailOrUser.trim() && 
-    password && 
-    !emailError && 
-    !passwordError &&
-    allCriteriaMet;
+  emailOrUser.trim() && 
+  password && 
+  !emailError && 
+  !passwordError;
 
   return (
     <div className="min-h-screen w-full relative flex items-center justify-center px-5 py-10 overflow-hidden bg-slate-950">
@@ -199,42 +206,7 @@ export default function LoginPage() {
                 </button>
               </div>
               
-              {password && (
-                <div className="mt-2 ml-5 space-y-1">
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className={passwordCriteria.minLength ? 'text-green-400' : 'text-white/60'}>
-                      {passwordCriteria.minLength ? '✓' : '○'}
-                    </span>
-                    <span className={passwordCriteria.minLength ? 'text-white/90' : 'text-white/60'}>
-                      At least 6 characters
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className={passwordCriteria.hasUpperCase ? 'text-green-400' : 'text-white/60'}>
-                      {passwordCriteria.hasUpperCase ? '✓' : '○'}
-                    </span>
-                    <span className={passwordCriteria.hasUpperCase ? 'text-white/90' : 'text-white/60'}>
-                      One uppercase letter
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className={passwordCriteria.hasLowerCase ? 'text-green-400' : 'text-white/60'}>
-                      {passwordCriteria.hasLowerCase ? '✓' : '○'}
-                    </span>
-                    <span className={passwordCriteria.hasLowerCase ? 'text-white/90' : 'text-white/60'}>
-                      One lowercase letter
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className={passwordCriteria.hasNumber ? 'text-green-400' : 'text-white/60'}>
-                      {passwordCriteria.hasNumber ? '✓' : '○'}
-                    </span>
-                    <span className={passwordCriteria.hasNumber ? 'text-white/90' : 'text-white/60'}>
-                      One number
-                    </span>
-                  </div>
-                </div>
-              )}
+              
               
               {passwordError && (
                 <p className="text-red-400 text-xs mt-1.5 ml-5">{passwordError}</p>
@@ -256,7 +228,9 @@ export default function LoginPage() {
                 type="button"
                 className="text-white/75 hover:text-white underline underline-offset-4"
               >
-                Forgot password?
+                <Link to="/forgot-password" className="text-white/75 hover:text-white underline underline-offset-4">
+  Forgot password?
+</Link>
               </button>
             </div>
 

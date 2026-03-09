@@ -4,9 +4,11 @@ import { Link, useNavigate } from "react-router-dom";
 export default function RegisterPage() {
   const navigate = useNavigate();
 
+  const PHONE_DIGITS = 10;
+
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState(""); 
   const [countryCode, setCountryCode] = useState("+1");
   const [email, setEmail] = useState("");
 
@@ -36,6 +38,8 @@ export default function RegisterPage() {
     confirm: "",
   });
 
+  const digitsOnlyPhone = (v: string) => v.replace(/\D/g, "");
+
   const emailOk = useMemo(() => {
     const r = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return r.test(email.trim());
@@ -47,14 +51,14 @@ export default function RegisterPage() {
       hasUpperCase: /[A-Z]/.test(password),
       hasLowerCase: /[a-z]/.test(password),
       hasNumber: /[0-9]/.test(password),
+      hasSymbol: /[^A-Za-z0-9]/.test(password),
     }),
     [password]
   );
 
   const allCriteriaMet = Object.values(passwordCriteria).every(Boolean);
 
-  const digitsOnlyPhone = (v: string) => v.replace(/\D/g, "");
-
+  
   useEffect(() => {
     if (!touched.email) return;
     if (!email.trim()) {
@@ -66,6 +70,22 @@ export default function RegisterPage() {
     }
   }, [email, emailOk, touched.email]);
 
+ 
+  useEffect(() => {
+    if (!touched.phone) return;
+
+    const ph = digitsOnlyPhone(phone);
+
+    if (!ph) {
+      setErrors((p) => ({ ...p, phone: "Phone number is required" }));
+    } else if (ph.length !== PHONE_DIGITS) {
+      setErrors((p) => ({ ...p, phone: "Enter a valid phone number" }));
+    } else {
+      setErrors((p) => ({ ...p, phone: "" }));
+    }
+  }, [phone, touched.phone]);
+
+  
   useEffect(() => {
     if (!touched.password) return;
     if (!password) {
@@ -77,6 +97,7 @@ export default function RegisterPage() {
     }
   }, [password, allCriteriaMet, touched.password]);
 
+ 
   useEffect(() => {
     if (!touched.confirm) return;
     if (!confirmPassword) {
@@ -113,7 +134,7 @@ export default function RegisterPage() {
     if (!ph) {
       next.phone = "Phone number is required";
       ok = false;
-    } else if (ph.length < 10) {
+    } else if (ph.length !== PHONE_DIGITS) {
       next.phone = "Enter a valid phone number";
       ok = false;
     }
@@ -146,7 +167,7 @@ export default function RegisterPage() {
     return ok;
   };
 
-  const onSubmit = (e: FormEvent) => {
+  const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
     setTouched({
@@ -160,18 +181,54 @@ export default function RegisterPage() {
 
     if (!validateAll()) return;
 
-    setIsLoading(true);
+    try {
+      setIsLoading(true);
 
-    setTimeout(() => {
+      const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
+
+      const response = await fetch(`${API_URL}/auth/register`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          phoneNumber: countryCode + digitsOnlyPhone(phone), 
+          email: email.trim(),
+          password,
+          confirmPassword,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Registration failed");
+      }
+
+      if (data.accessToken) {
+        localStorage.setItem("token", data.accessToken);
+      }
+      if (data.user) {
+        localStorage.setItem("user", JSON.stringify(data.user));
+      }
+
+      navigate("/");
+    } catch (error: any) {
+      setErrors((prev) => ({
+        ...prev,
+        email: error.message,
+      }));
+    } finally {
       setIsLoading(false);
-      navigate("/"); 
-    }, 1200);
+    }
   };
 
   const isFormValid =
     firstName.trim() &&
     lastName.trim() &&
-    digitsOnlyPhone(phone).length >= 10 &&
+    digitsOnlyPhone(phone).length === PHONE_DIGITS &&
     email.trim() &&
     emailOk &&
     password &&
@@ -245,7 +302,7 @@ export default function RegisterPage() {
                   value={countryCode}
                   onChange={(e) => setCountryCode(e.target.value)}
                   className="rounded-full bg-white/10 text-white px-4 py-3.5 outline-none border border-white/15 focus:border-white/35 focus:ring-2 focus:ring-white/20 appearance-none pr-8"
-                  style={{ width: '110px' }}
+                  style={{ width: "110px" }}
                 >
                   <option value="+1" className="bg-slate-900">🇺🇸 +1</option>
                   <option value="+44" className="bg-slate-900">🇬🇧 +44</option>
@@ -263,11 +320,19 @@ export default function RegisterPage() {
                   <option value="+52" className="bg-slate-900">🇲🇽 +52</option>
                   <option value="+27" className="bg-slate-900">🇿🇦 +27</option>
                 </select>
+
                 <input
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  onChange={(e) => {
+                    
+                    const digits = digitsOnlyPhone(e.target.value).slice(0, PHONE_DIGITS);
+                    setPhone(digits);
+                  }}
                   onBlur={() => setTouched((p) => ({ ...p, phone: true }))}
                   placeholder="Phone Number"
+                  inputMode="numeric"
+                  autoComplete="tel"
+                  maxLength={PHONE_DIGITS}
                   className={`flex-1 rounded-full bg-white/10 text-white placeholder-white/60 px-5 py-3.5 outline-none border ${
                     errors.phone ? "border-red-400" : "border-white/15"
                   } focus:border-white/35 focus:ring-2 focus:ring-white/20`}
@@ -371,6 +436,14 @@ export default function RegisterPage() {
                     </span>
                     <span className={passwordCriteria.hasNumber ? "text-white/90" : "text-white/60"}>
                       One number
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className={passwordCriteria.hasSymbol ? "text-green-400" : "text-white/60"}>
+                      {passwordCriteria.hasSymbol ? "✓" : "○"}
+                    </span>
+                    <span className={passwordCriteria.hasSymbol ? "text-white/90" : "text-white/60"}>
+                      One symbol (!@#$...)
                     </span>
                   </div>
                 </div>
