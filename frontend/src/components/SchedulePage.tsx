@@ -36,7 +36,10 @@ export default function SchedulePage() {
 
   const [rules, setRules] = useState<RuleDto[]>([]);
   const [selectedRuleIds, setSelectedRuleIds] = useState<string[]>([]);
-  const [isCreateRuleOpen, setIsCreateRuleOpen] = useState(false);
+  const [isRuleModalOpen, setIsRuleModalOpen] = useState(false);
+  const [ruleModalMode, setRuleModalMode] = useState<"create" | "edit">("create");
+  const [editingRule, setEditingRule] = useState<RuleDto | null>(null);
+  const [infoRule, setInfoRule] = useState<RuleDto | null>(null);
 
   // Initialize dates for current week
   const today = new Date();
@@ -423,10 +426,38 @@ export default function SchedulePage() {
       });
 
       setRules((prev) => [...prev, created]);
-      setIsCreateRuleOpen(false);
+      setIsRuleModalOpen(false);
     } catch (err) {
       console.error("Failed to create rule", err);
     }
+  };
+
+  const handleEditRuleSave = async (ruleData: {
+    name: string;
+    ifExercise: string;
+    ifActivityType: string;
+    ifTiming: string;
+    thenExercise: string;
+    thenActivityType: string;
+    thenRestriction: string;
+  }) => {
+    if (!editingRule) return;
+
+    // Frontend-only edit for now (no backend update endpoint yet)
+    setRules((prev) =>
+      prev.map((r) =>
+        r.id === editingRule.id
+          ? {
+              ...r,
+              ...ruleData,
+            }
+          : r
+      )
+    );
+
+    setEditingRule(null);
+    setRuleModalMode("create");
+    setIsRuleModalOpen(false);
   };
 
   return (
@@ -516,9 +547,9 @@ export default function SchedulePage() {
             {rules.length > 0 ? (
               <div className="space-y-2">
                 {rules.map((rule) => (
-                  <label
+                  <div
                     key={rule.id}
-                    className="flex items-start gap-3 p-2 rounded-lg bg-white/5 border border-white/10 cursor-pointer"
+                    className="flex items-start gap-3 p-2 rounded-lg bg-white/5 border border-white/10"
                   >
                     <input
                       type="checkbox"
@@ -526,14 +557,32 @@ export default function SchedulePage() {
                       onChange={() => toggleRuleSelection(rule.id)}
                       className="mt-1 w-4 h-4 rounded border-white/30 bg-white/10 accent-teal-500 cursor-pointer"
                     />
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="text-white font-medium text-sm truncate">{rule.name}</p>
-                      <p className="text-white/50 text-xs truncate">
-                        If {rule.ifExercise} {rule.ifActivityType} {rule.ifTiming}, then{" "}
-                        {rule.thenExercise} {rule.thenActivityType} is {rule.thenRestriction}
-                      </p>
                     </div>
-                  </label>
+                    <button
+                      type="button"
+                      onClick={() => setInfoRule(rule)}
+                      className="shrink-0 rounded-md p-1 text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+                      aria-label={`Rule details for ${rule.name}`}
+                      title="Rule details"
+                    >
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.25"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M12 16v-4" />
+                        <path d="M12 8h.01" />
+                      </svg>
+                    </button>
+                  </div>
                 ))}
               </div>
             ) : (
@@ -543,7 +592,11 @@ export default function SchedulePage() {
           <div className="shrink-0 p-4 pt-0">
             <button
               type="button"
-              onClick={() => setIsCreateRuleOpen(true)}
+              onClick={() => {
+                setRuleModalMode("create");
+                setEditingRule(null);
+                setIsRuleModalOpen(true);
+              }}
               className="w-full rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 px-4 text-center flex items-center justify-center gap-2"
               aria-label="Add rule"
             >
@@ -1001,12 +1054,88 @@ export default function SchedulePage() {
         </div>
       )}
 
-      {/* Create Rule Modal */}
-      {isCreateRuleOpen && (
+      {/* Rule info popup */}
+      {infoRule && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={() => setInfoRule(null)}
+        >
+          <div
+            className="relative w-full max-w-lg rounded-2xl border border-white/15 bg-slate-900 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <h2 className="text-xl font-bold text-white truncate">{infoRule.name}</h2>
+                  <p className="text-white/60 text-sm mt-1">
+                    If {infoRule.ifExercise} {infoRule.ifActivityType} {infoRule.ifTiming}, then{" "}
+                    {infoRule.thenExercise} {infoRule.thenActivityType} is {infoRule.thenRestriction}.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setInfoRule(null)}
+                  className="shrink-0 rounded-md p-2 text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+                  aria-label="Close rule details"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round">
+                    <path d="M18 6 6 18" />
+                    <path d="m6 6 12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setInfoRule(null)}
+                  className="flex-1 rounded-lg border border-white/20 bg-white/5 text-white py-2.5 font-medium hover:bg-white/10 transition-colors"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingRule(infoRule);
+                    setRuleModalMode("edit");
+                    setIsRuleModalOpen(true);
+                    setInfoRule(null);
+                  }}
+                  className="flex-1 rounded-lg bg-teal-600 hover:bg-teal-700 text-white py-2.5 font-semibold transition-colors"
+                >
+                  Edit rule
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create/Edit Rule Modal */}
+      {isRuleModalOpen && (
         <CreateRuleModal
-          isOpen={isCreateRuleOpen}
-          onClose={() => setIsCreateRuleOpen(false)}
-          onSave={handleSaveRule}
+          isOpen={isRuleModalOpen}
+          onClose={() => {
+            setIsRuleModalOpen(false);
+            setEditingRule(null);
+            setRuleModalMode("create");
+          }}
+          mode={ruleModalMode}
+          initialRule={
+            editingRule
+              ? {
+                  name: editingRule.name,
+                  ifExercise: editingRule.ifExercise,
+                  ifActivityType: editingRule.ifActivityType,
+                  ifTiming: editingRule.ifTiming,
+                  thenExercise: editingRule.thenExercise,
+                  thenActivityType: editingRule.thenActivityType,
+                  thenRestriction: editingRule.thenRestriction,
+                }
+              : undefined
+          }
+          onSave={ruleModalMode === "edit" ? handleEditRuleSave : handleSaveRule}
           exercisesFromSidebar={exercises}
         />
       )}

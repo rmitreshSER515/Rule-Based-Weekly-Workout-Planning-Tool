@@ -5,6 +5,8 @@ interface CreateRuleModalProps {
   onClose: () => void;
   onSave: (rule: RuleData) => void;
   exercisesFromSidebar: { id: string; name: string; notes: string }[];
+  mode?: "create" | "edit";
+  initialRule?: RuleData;
 }
 
 interface RuleData {
@@ -21,7 +23,14 @@ const exercises = ["Hard", "Easy", "Medium"];
 const timings = ["the day before", "the day after", "the same day"];
 const restrictions = ["not allowed", "allowed"];
 
-export default function CreateRuleModal({ isOpen, onClose, onSave, exercisesFromSidebar }: CreateRuleModalProps) {
+export default function CreateRuleModal({
+  isOpen,
+  onClose,
+  onSave,
+  exercisesFromSidebar,
+  mode = "create",
+  initialRule,
+}: CreateRuleModalProps) {
   const firstSidebarExerciseName = useMemo(
     () => (exercisesFromSidebar[0]?.name ?? ""),
     [exercisesFromSidebar]
@@ -35,17 +44,32 @@ export default function CreateRuleModal({ isOpen, onClose, onSave, exercisesFrom
   const [thenActivityType, setThenActivityType] = useState(firstSidebarExerciseName);
   const [thenRestriction, setThenRestriction] = useState(restrictions[0]);
 
-  // When the list of sidebar exercises changes (or modal opens),
-  // keep the selected activity types in sync if they were empty.
+  const applyDefaults = () => {
+    setRuleName("");
+    setIfExercise(exercises[0]);
+    setIfActivityType(firstSidebarExerciseName);
+    setIfTiming(timings[0]);
+    setThenExercise(exercises[0]);
+    setThenActivityType(firstSidebarExerciseName);
+    setThenRestriction(restrictions[0]);
+  };
+
   useEffect(() => {
     if (!isOpen) return;
-    if (!ifActivityType && firstSidebarExerciseName) {
-      setIfActivityType(firstSidebarExerciseName);
+
+    if (mode === "edit" && initialRule) {
+      setRuleName(initialRule.name ?? "");
+      setIfExercise(initialRule.ifExercise ?? exercises[0]);
+      setIfActivityType(initialRule.ifActivityType ?? firstSidebarExerciseName);
+      setIfTiming(initialRule.ifTiming ?? timings[0]);
+      setThenExercise(initialRule.thenExercise ?? exercises[0]);
+      setThenActivityType(initialRule.thenActivityType ?? firstSidebarExerciseName);
+      setThenRestriction(initialRule.thenRestriction ?? restrictions[0]);
+      return;
     }
-    if (!thenActivityType && firstSidebarExerciseName) {
-      setThenActivityType(firstSidebarExerciseName);
-    }
-  }, [isOpen, firstSidebarExerciseName]);
+
+    applyDefaults();
+  }, [isOpen, mode, initialRule, firstSidebarExerciseName]);
 
   const handleSave = () => {
     onSave({
@@ -61,13 +85,7 @@ export default function CreateRuleModal({ isOpen, onClose, onSave, exercisesFrom
   };
 
   const resetForm = () => {
-    setRuleName("");
-    setIfExercise(exercises[0]);
-    setIfActivityType(firstSidebarExerciseName);
-    setIfTiming(timings[0]);
-    setThenExercise(exercises[0]);
-    setThenActivityType(firstSidebarExerciseName);
-    setThenRestriction(restrictions[0]);
+    applyDefaults();
   };
 
   const handleClose = () => {
@@ -105,7 +123,9 @@ export default function CreateRuleModal({ isOpen, onClose, onSave, exercisesFrom
           <div className="relative z-10 p-8">
             {/* Header */}
             <div className="mb-8">
-              <h2 className="text-3xl font-bold text-white">Create Rule</h2>
+              <h2 className="text-3xl font-bold text-white">
+                {mode === "edit" ? "Edit Rule" : "Create Rule"}
+              </h2>
             </div>
 
             {/* Form */}
@@ -231,7 +251,7 @@ export default function CreateRuleModal({ isOpen, onClose, onSave, exercisesFrom
                 onClick={handleSave}
                 className="flex-1 rounded-lg bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:shadow-lg hover:shadow-emerald-500/40 text-white font-semibold py-3 px-4 transition-all hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-slate-950"
               >
-                Save
+                {mode === "edit" ? "Save changes" : "Save"}
               </button>
             </div>
           </div>
