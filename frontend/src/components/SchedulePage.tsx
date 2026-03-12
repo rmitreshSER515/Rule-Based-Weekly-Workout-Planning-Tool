@@ -6,6 +6,30 @@ import { fetchExercises, createExercise, type ExerciseDto } from "../api/exercis
 import { fetchRules, createRule, type RuleDto } from "../api/rules";
 import { getExerciseIcon } from "../utils/exerciseIcons";
 
+type IntensityLevel = "low" | "moderate" | "high";
+
+const normalizeIntensity = (value: string): IntensityLevel | null => {
+  switch (value.trim().toLowerCase()) {
+    case "low":
+    case "easy":
+      return "low";
+    case "moderate":
+    case "medium":
+      return "moderate";
+    case "high":
+    case "hard":
+      return "high";
+    default:
+      return null;
+  }
+};
+
+const shiftDateKeyByDays = (dateKey: string, days: number): string => {
+  const base = new Date(`${dateKey}T00:00:00`);
+  base.setDate(base.getDate() + days);
+  return base.toISOString().split("T")[0];
+};
+
 const getDaysInRange = (startDate: Date, endDate: Date): Date[] => {
   const days: Date[] = [];
   const current = new Date(startDate);
@@ -30,7 +54,7 @@ const EXERCISE_NAME_MAX_LENGTH = 25;
 export default function SchedulePage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const isCreateMode = (location.state as { mode?: string } | null)?.mode === "create";
+  void location;
 
   const handleLogout = () => logout(navigate);
 
@@ -156,7 +180,7 @@ export default function SchedulePage() {
       exerciseId: string;
       name: string;
       notes: string;
-      intensity: "low" | "moderate" | "high";
+      intensity: IntensityLevel;
       duration: { hours: string; minutes: string };
     }[]>
   >({});
@@ -166,7 +190,7 @@ export default function SchedulePage() {
   const [pendingDrop, setPendingDrop] = useState<{
     exerciseId: string; name: string; notes: string; targetDateKey: string;
   } | null>(null);
-  const [selectedIntensity, setSelectedIntensity] = useState<"low" | "moderate" | "high">("low");
+  const [selectedIntensity, setSelectedIntensity] = useState<IntensityLevel>("low");
   const [durationHours, setDurationHours] = useState("");
   const [durationMinutes, setDurationMinutes] = useState("");
 
@@ -257,6 +281,89 @@ export default function SchedulePage() {
     [exercises]
   );
 
+  const selectedRules = useMemo(
+    () => rules.filter((rule) => selectedRuleIds.includes(rule.id)),
+    [rules, selectedRuleIds]
+  );
+  const activeRules = useMemo(
+    () => (selectedRules.length > 0 ? selectedRules : rules),
+    [selectedRules, rules]
+  );
+
+  const validateRuleForPlacement = useCallback(
+    ({
+      itemId,
+      exerciseName,
+      intensity,
+      dateKey,
+    }: {
+      itemId: string | null;
+      exerciseName: string;
+      intensity: IntensityLevel;
+      dateKey: string;
+    }): string | null => {
+      const normalizedExerciseName = exerciseName.trim().toLowerCase();
+      const relevantRules = activeRules.filter(
+        (rule) => rule.thenRestriction.trim().toLowerCase() === "not allowed"
+      );
+
+      for (const rule of relevantRules) {
+        const ifIntensity = normalizeIntensity(rule.ifExercise);
+        const thenIntensity = normalizeIntensity(rule.thenExercise);
+        if (!ifIntensity || !thenIntensity) continue;
+
+        const ifExerciseName = rule.ifActivityType.trim().toLowerCase();
+        const thenExerciseName = rule.thenActivityType.trim().toLowerCase();
+        const ifTiming = rule.ifTiming.trim().toLowerCase();
+
+        const candidateMatchesThen =
+          normalizedExerciseName === thenExerciseName && intensity === thenIntensity;
+
+        if (candidateMatchesThen) {
+          let ifDateKey = dateKey;
+          if (ifTiming === "the day before") ifDateKey = shiftDateKeyByDays(dateKey, -1);
+          if (ifTiming === "the day after") ifDateKey = shiftDateKeyByDays(dateKey, 1);
+
+          const hasMatchingIf = (calendarExercises[ifDateKey] || []).some((entry) => {
+            if (entry.id === itemId) return false;
+            return (
+              entry.name.trim().toLowerCase() === ifExerciseName &&
+              entry.intensity === ifIntensity
+            );
+          });
+
+          if (hasMatchingIf) {
+            return `Rule violation: "${rule.name}" does not allow ${exerciseName} (${intensity}) on this day.`;
+          }
+        }
+
+        const candidateMatchesIf =
+          normalizedExerciseName === ifExerciseName && intensity === ifIntensity;
+
+        if (candidateMatchesIf) {
+          let thenDateKey = dateKey;
+          if (ifTiming === "the day before") thenDateKey = shiftDateKeyByDays(dateKey, 1);
+          if (ifTiming === "the day after") thenDateKey = shiftDateKeyByDays(dateKey, -1);
+
+          const hasBlockedThen = (calendarExercises[thenDateKey] || []).some((entry) => {
+            if (entry.id === itemId) return false;
+            return (
+              entry.name.trim().toLowerCase() === thenExerciseName &&
+              entry.intensity === thenIntensity
+            );
+          });
+
+          if (hasBlockedThen) {
+            return `Rule violation: "${rule.name}" conflicts with existing workouts around this day.`;
+          }
+        }
+      }
+
+      return null;
+    },
+    [calendarExercises, activeRules]
+  );
+
   const removeCalendarExercise = useCallback((dateKey: string, itemId: string) => {
     setCalendarExercises((prev) => ({
       ...prev,
@@ -272,6 +379,21 @@ export default function SchedulePage() {
 
       if (editingItem) {
         const { itemId, dateKey } = editingItem;
+        const currentItem = (calendarExercises[dateKey] || []).find((i) => i.id === itemId);
+        if (!currentItem) return;
+
+        const violation = validateRuleForPlacement({
+          itemId,
+          exerciseName: currentItem.name,
+          intensity: selectedIntensity,
+          dateKey,
+        });
+
+        if (violation) {
+          alert(violation);
+          return;
+        }
+
         setCalendarExercises((prev) => ({
           ...prev,
           [dateKey]: (prev[dateKey] || []).map((i) =>
@@ -282,6 +404,18 @@ export default function SchedulePage() {
         setPendingDrop(null);
       } else if (pendingDrop) {
         const { exerciseId, name, notes, targetDateKey } = pendingDrop;
+        const violation = validateRuleForPlacement({
+          itemId: null,
+          exerciseName: name,
+          intensity: selectedIntensity,
+          dateKey: targetDateKey,
+        });
+
+        if (violation) {
+          alert(violation);
+          return;
+        }
+
         setCalendarExercises((prev) => ({
           ...prev,
           [targetDateKey]: [
@@ -296,7 +430,15 @@ export default function SchedulePage() {
       setDurationHours("");
       setDurationMinutes("");
     },
-    [pendingDrop, editingItem, selectedIntensity, durationHours, durationMinutes]
+    [
+      pendingDrop,
+      editingItem,
+      selectedIntensity,
+      durationHours,
+      durationMinutes,
+      calendarExercises,
+      validateRuleForPlacement,
+    ]
   );
 
   const handleIntensityCancel = useCallback(() => {
@@ -311,7 +453,7 @@ export default function SchedulePage() {
     (dateKey: string, item: {
       id: string;
       name: string;
-      intensity: "low" | "moderate" | "high";
+      intensity: IntensityLevel;
       duration: { hours: string; minutes: string };
     }) => {
       setEditingItem({ itemId: item.id, dateKey });
@@ -393,11 +535,6 @@ export default function SchedulePage() {
     }
     return result;
   }, [days]);
-
-  const selectedRules = useMemo(
-    () => rules.filter((rule) => selectedRuleIds.includes(rule.id)),
-    [rules, selectedRuleIds]
-  );
 
   const toggleRuleSelection = (ruleId: string) => {
     setSelectedRuleIds((prev) =>
@@ -841,7 +978,7 @@ export default function SchedulePage() {
                     id="drop-intensity"
                     value={selectedIntensity}
                     onChange={(e) =>
-                      setSelectedIntensity(e.target.value as "low" | "moderate" | "high")
+                      setSelectedIntensity(e.target.value as IntensityLevel)
                     }
                     className="w-full rounded-lg bg-white/10 border border-white/15 text-white px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer"
                   >
