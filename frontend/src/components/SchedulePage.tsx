@@ -1,9 +1,10 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import CreateRuleModal from "./CreateRuleModal";
 import { logout } from "../utils/auth";
 import { fetchExercises, createExercise, type ExerciseDto } from "../api/exercises";
 import { fetchRules, createRule, type RuleDto } from "../api/rules";
+import { fetchSchedule, saveSchedule } from "../api/schedules";
 import { getExerciseIcon } from "../utils/exerciseIcons";
 
 const getDaysInRange = (startDate: Date, endDate: Date): Date[] => {
@@ -52,19 +53,21 @@ export default function SchedulePage() {
   const [endDate, setEndDate] = useState<string>(
     nextWeek.toISOString().split("T")[0]
   );
-  const [scheduleTitle, setScheduleTitle] = useState<string>(() => {
-    return localStorage.getItem("scheduleTitle") || "";
-  });
-  const [isEditingTitle, setIsEditingTitle] = useState(() => {
-    return !localStorage.getItem("scheduleTitle");
-  });
-  const [titleDraft, setTitleDraft] = useState(scheduleTitle);
+  const [scheduleTitle, setScheduleTitle] = useState<string>("");
+  const [isEditingTitle, setIsEditingTitle] = useState(true);
+  const [titleDraft, setTitleDraft] = useState("");
+
+  // Save-related state
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const lastSavedSnapshotRef = useRef<string>("");
+  const [scheduleLoaded, setScheduleLoaded] = useState(false);
 
   const handleTitleSave = () => {
     const trimmed = titleDraft.trim();
     if (!trimmed) return;
     setScheduleTitle(trimmed);
-    localStorage.setItem("scheduleTitle", trimmed);
     setIsEditingTitle(false);
   };
 
@@ -164,6 +167,92 @@ export default function SchedulePage() {
     }[]>
   >({});
   const [dragOverDate, setDragOverDate] = useState<string | null>(null);
+
+  // Build a snapshot of saveable state for dirty-checking
+  const getCurrentSnapshot = useCallback(() => {
+    return JSON.stringify({
+      title: scheduleTitle,
+      startDate,
+      endDate,
+      selectedRuleIds,
+      calendarExercises,
+    });
+  }, [scheduleTitle, startDate, endDate, selectedRuleIds, calendarExercises]);
+
+  const hasUnsavedChanges = useMemo(() => {
+    if (!scheduleLoaded) return false;
+    if (!lastSavedSnapshotRef.current) return true; // never saved
+    return getCurrentSnapshot() !== lastSavedSnapshotRef.current;
+  }, [getCurrentSnapshot, scheduleLoaded]);
+
+  // Load schedule from DB on mount
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+
+    const loadSchedule = async () => {
+      try {
+        const saved = await fetchSchedule(userId);
+        if (cancelled) return;
+        if (saved) {
+          setScheduleTitle(saved.title);
+          setTitleDraft(saved.title);
+          setIsEditingTitle(false);
+          setStartDate(saved.startDate);
+          setEndDate(saved.endDate);
+          setSelectedRuleIds(saved.selectedRuleIds ?? []);
+          setCalendarExercises(saved.calendarExercises ?? {});
+          // set the snapshot AFTER a tick so derived state picks it up
+          setTimeout(() => {
+            lastSavedSnapshotRef.current = JSON.stringify({
+              title: saved.title,
+              startDate: saved.startDate,
+              endDate: saved.endDate,
+              selectedRuleIds: saved.selectedRuleIds ?? [],
+              calendarExercises: saved.calendarExercises ?? {},
+            });
+            setScheduleLoaded(true);
+          }, 0);
+        } else {
+          setScheduleLoaded(true);
+        }
+      } catch (err) {
+        console.error("Failed to load schedule", err);
+        if (!cancelled) setScheduleLoaded(true);
+      }
+    };
+
+    loadSchedule();
+    return () => { cancelled = true; };
+  }, [userId]);
+
+  // Save handler
+  const handleSaveChanges = useCallback(async () => {
+    if (!userId || !scheduleTitle.trim()) return;
+    setIsSaving(true);
+    setSaveError("");
+    setSaveSuccess(false);
+
+    try {
+      await saveSchedule({
+        userId,
+        title: scheduleTitle.trim(),
+        startDate,
+        endDate,
+        selectedRuleIds,
+        calendarExercises,
+      });
+      lastSavedSnapshotRef.current = getCurrentSnapshot();
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2500);
+    } catch (err: any) {
+      console.error("Failed to save schedule", err);
+      setSaveError(err?.message ?? "Failed to save");
+      setTimeout(() => setSaveError(""), 4000);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [userId, scheduleTitle, startDate, endDate, selectedRuleIds, calendarExercises, getCurrentSnapshot]);
 
   // Intensity & duration popup state
   const [pendingDrop, setPendingDrop] = useState<{
@@ -672,6 +761,32 @@ export default function SchedulePage() {
               )}
             </div>
             <div className="shrink-0 flex items-center gap-3">
+              {/* Unsaved changes prompt */}
+              {hasUnsavedChanges && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/20 border border-amber-400/30 px-3 py-1.5 text-xs font-medium text-amber-300 animate-pulse">
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                  Unsaved changes
+                </span>
+              )}
+              {/* Save success badge */}
+              {saveSuccess && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 border border-emerald-400/30 px-3 py-1.5 text-xs font-medium text-emerald-300">
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  Saved!
+                </span>
+              )}
+              {/* Save error badge */}
+              {saveError && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500/20 border border-red-400/30 px-3 py-1.5 text-xs font-medium text-red-300">
+                  {saveError}
+                </span>
+              )}
               <button
                 type="button"
                 onClick={handleLogout}
@@ -681,23 +796,32 @@ export default function SchedulePage() {
               </button>
               <button
                 type="button"
-                className="group relative inline-flex items-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 px-6 py-3 font-semibold text-white shadow-lg shadow-emerald-500/25 transition-all duration-300 hover:shadow-xl hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-slate-950"
+                onClick={handleSaveChanges}
+                disabled={isSaving || !scheduleTitle.trim()}
+                className="group relative inline-flex items-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 px-6 py-3 font-semibold text-white shadow-lg shadow-emerald-500/25 transition-all duration-300 hover:shadow-xl hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
               >
                 <span className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
-                <svg
-                  className="h-5 w-5 shrink-0"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                  <polyline points="17 21 17 13 7 13 7 21" />
-                  <polyline points="7 3 7 8 15 8" />
-                </svg>
-                <span>Save Changes</span>
+                {isSaving ? (
+                  <svg className="h-5 w-5 shrink-0 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                ) : (
+                  <svg
+                    className="h-5 w-5 shrink-0"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                    <polyline points="17 21 17 13 7 13 7 21" />
+                    <polyline points="7 3 7 8 15 8" />
+                  </svg>
+                )}
+                <span>{isSaving ? "Saving..." : "Save Changes"}</span>
               </button>
             </div>
           </div>
