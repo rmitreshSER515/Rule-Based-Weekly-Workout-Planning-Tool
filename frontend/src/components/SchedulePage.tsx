@@ -408,7 +408,7 @@ export default function SchedulePage() {
     );
   };
 
-  const handleSaveRule = async (ruleData: {
+  type RuleData = {
     name: string;
     ifExercise: string;
     ifActivityType: string;
@@ -416,8 +416,43 @@ export default function SchedulePage() {
     thenExercise: string;
     thenActivityType: string;
     thenRestriction: string;
-  }) => {
+  };
+
+  const findDuplicateRule = useCallback(
+    (ruleData: RuleData, excludeId: string | null): { duplicateName: RuleDto | null; duplicateCriteria: RuleDto | null } => {
+      let duplicateName: RuleDto | null = null;
+      let duplicateCriteria: RuleDto | null = null;
+      const nameLower = ruleData.name.trim().toLowerCase();
+      for (const r of rules) {
+        if (r.id === excludeId) continue;
+        if (r.name.trim().toLowerCase() === nameLower) duplicateName = r;
+        const sameCriteria =
+          r.ifExercise === ruleData.ifExercise &&
+          r.ifActivityType === ruleData.ifActivityType &&
+          r.ifTiming === ruleData.ifTiming &&
+          r.thenExercise === ruleData.thenExercise &&
+          r.thenActivityType === ruleData.thenActivityType &&
+          r.thenRestriction === ruleData.thenRestriction;
+        if (sameCriteria) duplicateCriteria = r;
+        if (duplicateName && duplicateCriteria) break;
+      }
+      return { duplicateName, duplicateCriteria };
+    },
+    [rules]
+  );
+
+  const handleSaveRule = async (ruleData: RuleData) => {
     if (!userId) return;
+
+    const { duplicateName, duplicateCriteria } = findDuplicateRule(ruleData, null);
+    if (duplicateName) {
+      alert(`Can't create rule because a rule with this name already exists: ${duplicateName.name}`);
+      return;
+    }
+    if (duplicateCriteria) {
+      alert(`Can't create rule because rule already exists: ${duplicateCriteria.name}`);
+      return;
+    }
 
     try {
       const created = await createRule({
@@ -432,18 +467,19 @@ export default function SchedulePage() {
     }
   };
 
-  const handleEditRuleSave = async (ruleData: {
-    name: string;
-    ifExercise: string;
-    ifActivityType: string;
-    ifTiming: string;
-    thenExercise: string;
-    thenActivityType: string;
-    thenRestriction: string;
-  }) => {
+  const handleEditRuleSave = async (ruleData: RuleData) => {
     if (!editingRule) return;
 
-    // Frontend-only edit for now (no backend update endpoint yet)
+    const { duplicateName, duplicateCriteria } = findDuplicateRule(ruleData, editingRule.id);
+    if (duplicateName) {
+      alert(`Can't create rule because a rule with this name already exists: ${duplicateName.name}`);
+      return;
+    }
+    if (duplicateCriteria) {
+      alert(`Can't create rule because rule already exists: ${duplicateCriteria.name}`);
+      return;
+    }
+
     setRules((prev) =>
       prev.map((r) =>
         r.id === editingRule.id
