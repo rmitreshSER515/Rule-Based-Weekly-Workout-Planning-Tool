@@ -5,16 +5,29 @@ import SchedulePage from "./components/SchedulePage";
 import RegisterPage from "./components/RegisterPage";
 import ForgotPasswordPage from "./components/Forgotpasswordpage";
 
+const token = () => localStorage.getItem("token");
+
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  return token() ? <>{children}</> : <Navigate to="/login" replace />;
+}
+
+function PublicOnlyRoute({ children }: { children: React.ReactNode }) {
+  return !token() ? <>{children}</> : <Navigate to="/fitness" replace />;
+}
+
 export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Navigate to="/login" replace />} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
-      <Route path="/fitness" element={<FitnessTrackerPage />} />
-      <Route path="/schedules" element={<SchedulePage />} />
+
+      <Route path="/login" element={<PublicOnlyRoute><LoginPage /></PublicOnlyRoute>} />
+      <Route path="/register" element={<PublicOnlyRoute><RegisterPage /></PublicOnlyRoute>} />
+      <Route path="/forgot-password" element={<PublicOnlyRoute><ForgotPasswordPage /></PublicOnlyRoute>} />
+
+      <Route path="/fitness" element={<ProtectedRoute><FitnessTrackerPage /></ProtectedRoute>} />
+      <Route path="/schedules" element={<ProtectedRoute><SchedulePage /></ProtectedRoute>} />
+
       <Route path="*" element={<Navigate to="/login" replace />} />
-      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
     </Routes>
   );
 }
