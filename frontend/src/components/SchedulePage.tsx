@@ -614,6 +614,28 @@ export default function SchedulePage() {
 
       {/* Left Sidebar */}
       <div className="relative z-10 w-[300px] flex flex-col border-r border-white/15 bg-white/5 backdrop-blur-xl">
+
+      <div className="px-4 pt-4 pb-2">
+    <button
+      type="button"
+      onClick={() => navigate("/fitness")}
+      className="flex items-center gap-1.5 text-white/40 hover:text-white/80 text-xs font-medium transition-colors duration-200 group w-fit"
+    >
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+        <path
+          d="M19 12H5M5 12l7 7M5 12l7-7"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+      <span className="group-hover:underline underline-offset-2 tracking-wide uppercase">
+        Compare/create new schedules
+      </span>
+    </button>
+  </div>
+
         {/* Exercises Panel */}
         <div className="flex flex-col h-1/2 border-b border-white/15">
           <div className="p-4">
