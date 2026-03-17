@@ -297,6 +297,7 @@ export default function SchedulePage() {
   const [selectedIntensity, setSelectedIntensity] = useState<IntensityLevel>("low");
   const [durationHours, setDurationHours] = useState("");
   const [durationMinutes, setDurationMinutes] = useState("");
+  const [violationMessage, setViolationMessage] = useState<string | null>(null);
 
   // Editing state (null = adding new, object = editing existing)
   const [editingItem, setEditingItem] = useState<{
@@ -494,7 +495,7 @@ export default function SchedulePage() {
         });
 
         if (violation) {
-          alert(violation);
+          setViolationMessage(violation);
           return;
         }
 
@@ -516,7 +517,7 @@ export default function SchedulePage() {
         });
 
         if (violation) {
-          alert(violation);
+          setViolationMessage(violation);
           return;
         }
 
@@ -551,6 +552,10 @@ export default function SchedulePage() {
     setSelectedIntensity("low");
     setDurationHours("");
     setDurationMinutes("");
+  }, []);
+
+  const closeViolationPopup = useCallback(() => {
+    setViolationMessage(null);
   }, []);
 
   const openEditPopup = useCallback(
@@ -1299,6 +1304,60 @@ export default function SchedulePage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Rule Violation Popup */}
+      {violationMessage && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={closeViolationPopup}
+        >
+          <div
+            className="relative w-full max-w-md rounded-2xl border border-red-400/30 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="absolute inset-0 rounded-2xl ring-1 ring-inset ring-red-500/25" />
+            <div className="relative p-6">
+              <div className="flex items-start gap-3">
+                <div className="shrink-0 rounded-full bg-red-500/15 p-2 ring-1 ring-red-400/40">
+                  <svg
+                    className="h-5 w-5 text-red-300"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M12 9v4" />
+                    <path d="M12 17h.01" />
+                    <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                  </svg>
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-lg font-semibold text-white">Rule violation</h3>
+                  <p className="mt-1 text-sm text-white/70">{violationMessage}</p>
+                </div>
+              </div>
+              <div className="mt-5 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={closeViolationPopup}
+                  className="rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white hover:bg-white/10 transition-colors"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={closeViolationPopup}
+                  className="rounded-lg bg-gradient-to-r from-rose-500 via-red-500 to-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-red-500/30 hover:shadow-red-500/50 transition-all"
+                >
+                  Got it
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
