@@ -1,5 +1,7 @@
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { logout } from "../utils/auth";
+import { fetchSchedule } from "../api/schedules";
 
 type ScheduleCard = {
   id: string;
@@ -12,10 +14,37 @@ type ScheduleCard = {
 
 export default function FitnessTrackerPage() {
   const navigate = useNavigate();
+  const [schedules, setSchedules] = useState<ScheduleCard[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("user");
+      if (!stored) {
+        setUserId(null);
+        return;
+      }
+      const user = JSON.parse(stored);
+      const id = user?.id ?? user?._id ?? null;
+      setUserId(typeof id === "string" ? id : null);
+    } catch {
+      setUserId(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    fetchSchedule(userId).then((data) => {
+      if (cancelled) return;
+      setSchedules(data ? [{ id: data.id, title: data.title, startDate: data.startDate, endDate: data.endDate }] : []);
+    }).catch(() => {
+      if (!cancelled) setSchedules([]);
+    });
+    return () => { cancelled = true; };
+  }, [userId]);
 
   const handleLogout = () => logout(navigate);
-
-  const schedules: ScheduleCard[] = [];
 
   const handleCreateSchedule = () => {
     navigate("/schedules", { state: { mode: "create" } });
