@@ -9,6 +9,18 @@ import { getExerciseIcon } from "../utils/exerciseIcons";
 
 type IntensityLevel = "low" | "moderate" | "high";
 
+const dateKeyFromDateLocal = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const parseDateKeyLocal = (dateKey: string): Date => {
+  const [year, month, day] = dateKey.split("-").map((value) => Number(value));
+  return new Date(year, month - 1, day);
+};
+
 const normalizeIntensity = (value: string): IntensityLevel | null => {
   switch (value.trim().toLowerCase()) {
     case "low":
@@ -26,9 +38,9 @@ const normalizeIntensity = (value: string): IntensityLevel | null => {
 };
 
 const shiftDateKeyByDays = (dateKey: string, days: number): string => {
-  const base = new Date(`${dateKey}T00:00:00`);
+  const base = parseDateKeyLocal(dateKey);
   base.setDate(base.getDate() + days);
-  return base.toISOString().split("T")[0];
+  return dateKeyFromDateLocal(base);
 };
 
 const getDaysInRange = (startDate: Date, endDate: Date): Date[] => {
@@ -72,10 +84,10 @@ export default function SchedulePage() {
   nextWeek.setDate(today.getDate() + 6);
 
   const [startDate, setStartDate] = useState<string>(
-    today.toISOString().split("T")[0]
+    dateKeyFromDateLocal(today)
   );
   const [endDate, setEndDate] = useState<string>(
-    nextWeek.toISOString().split("T")[0]
+    dateKeyFromDateLocal(nextWeek)
   );
   const [scheduleTitle, setScheduleTitle] = useState<string>("");
   const [isEditingTitle, setIsEditingTitle] = useState(true);
@@ -292,7 +304,7 @@ export default function SchedulePage() {
   } | null>(null);
 
   const getDateKey = (date: Date): string => {
-    return date.toISOString().split("T")[0];
+    return dateKeyFromDateLocal(date);
   };
 
   // Sidebar drag start
@@ -615,8 +627,8 @@ export default function SchedulePage() {
   };
 
   const days = useMemo(() => {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+    const start = parseDateKeyLocal(startDate);
+    const end = parseDateKeyLocal(endDate);
     return getDaysInRange(start, end);
   }, [startDate, endDate]);
 
