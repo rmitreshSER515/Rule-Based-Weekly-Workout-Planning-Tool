@@ -395,6 +395,63 @@ export default function SchedulePage() {
     [selectedRules, rules]
   );
 
+  const ruleViolations = useMemo(() => {
+    if (selectedRules.length === 0) return new Map<string, string>();
+
+    const violations = new Map<string, string>();
+    const addViolation = (itemId: string, message: string) => {
+      if (!violations.has(itemId)) {
+        violations.set(itemId, message);
+      }
+    };
+
+    for (const rule of selectedRules) {
+      if (rule.thenRestriction.trim().toLowerCase() !== "not allowed") continue;
+
+      const ifIntensity = normalizeIntensity(rule.ifExercise);
+      const thenIntensity = normalizeIntensity(rule.thenExercise);
+      if (!ifIntensity || !thenIntensity) continue;
+
+      const ifExerciseName = rule.ifActivityType.trim().toLowerCase();
+      const thenExerciseName = rule.thenActivityType.trim().toLowerCase();
+      const ifTiming = rule.ifTiming.trim().toLowerCase();
+
+      for (const [dateKey, items] of Object.entries(calendarExercises)) {
+        for (const ifItem of items) {
+          if (
+            ifItem.name.trim().toLowerCase() !== ifExerciseName ||
+            ifItem.intensity !== ifIntensity
+          ) {
+            continue;
+          }
+
+          let thenDateKey = dateKey;
+          if (ifTiming === "the day before") thenDateKey = shiftDateKeyByDays(dateKey, 1);
+          if (ifTiming === "the day after") thenDateKey = shiftDateKeyByDays(dateKey, -1);
+
+          const thenItems = calendarExercises[thenDateKey] || [];
+          for (const thenItem of thenItems) {
+            if (
+              thenItem.name.trim().toLowerCase() !== thenExerciseName ||
+              thenItem.intensity !== thenIntensity
+            ) {
+              continue;
+            }
+
+            addViolation(
+              thenItem.id,
+              `Rule violation: "${rule.name}" does not allow ${thenItem.name} (${thenItem.intensity}) on this day.`
+            );
+          }
+        }
+      }
+    }
+
+    return violations;
+  }, [calendarExercises, selectedRules]);
+
+  const hasRuleViolations = ruleViolations.size > 0;
+
   const validateRuleForPlacement = useCallback(
     ({
       itemId,
@@ -557,6 +614,11 @@ export default function SchedulePage() {
   const closeViolationPopup = useCallback(() => {
     setViolationMessage(null);
   }, []);
+
+  const getViolationMessage = useCallback(
+    (itemId: string) => ruleViolations.get(itemId) ?? null,
+    [ruleViolations]
+  );
 
   const openEditPopup = useCallback(
     (dateKey: string, item: {
@@ -1009,7 +1071,7 @@ export default function SchedulePage() {
               <button
                 type="button"
                 onClick={handleSaveChanges}
-                disabled={isSaving || !scheduleTitle.trim()}
+                disabled={isSaving || !scheduleTitle.trim() || hasRuleViolations}
                 className="group relative inline-flex items-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 px-6 py-3 font-semibold text-white shadow-lg shadow-emerald-500/25 transition-all duration-300 hover:shadow-xl hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
               >
                 <span className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
@@ -1096,97 +1158,127 @@ export default function SchedulePage() {
                         onDragLeave={handleDragLeave}
                         onDrop={(e) => handleDrop(e, getDateKey(day))}
                       >
-                        {(calendarExercises[getDateKey(day)] || []).map((item) => (
-                          <div
-                            key={item.id}
-                            draggable
-                            onDragStart={(e) =>
-                              handleCalendarDragStart(e, item.id, getDateKey(day))
-                            }
-                            className="mb-2 rounded-lg bg-orange-500/20 border border-orange-400/30 px-2.5 py-1.5 cursor-grab active:cursor-grabbing select-none group transition-all duration-150 hover:bg-orange-500/30 hover:border-orange-400/50"
-                          >
-                            <div className="flex items-start justify-between gap-1">
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className="w-4 h-4 text-white/80">
-                                    {getExerciseIcon(item.name, "16")}
-                                  </span>
-                                  <p className="text-white font-medium text-xs leading-snug">
-                                    {item.name}
-                                  </p>
-                                  <span
-                                    className={`shrink-0 inline-block rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none ${item.intensity === "low"
-                                      ? "bg-emerald-500/25 text-emerald-300 ring-1 ring-emerald-400/40"
-                                      : item.intensity === "moderate"
-                                        ? "bg-amber-500/25 text-amber-300 ring-1 ring-amber-400/40"
-                                        : "bg-red-500/25 text-red-300 ring-1 ring-red-400/40"
-                                      }`}
-                                  >
-                                    {item.intensity === "low"
-                                      ? "L"
-                                      : item.intensity === "moderate"
-                                        ? "M"
-                                        : "H"}
-                                  </span>
-                                  {(item.duration.hours || item.duration.minutes) && (
-                                    <span className="shrink-0 inline-block rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] font-medium leading-none text-white/70 ring-1 ring-white/15">
-                                      {item.duration.hours ? `${item.duration.hours}h` : ""}
-                                      {item.duration.hours && item.duration.minutes ? " " : ""}
-                                      {item.duration.minutes ? `${item.duration.minutes}m` : ""}
+                        {(calendarExercises[getDateKey(day)] || []).map((item) => {
+                          const itemViolation = getViolationMessage(item.id);
+                          return (
+                            <div
+                              key={item.id}
+                              draggable
+                              onDragStart={(e) =>
+                                handleCalendarDragStart(e, item.id, getDateKey(day))
+                              }
+                              className={`mb-2 rounded-lg border px-2.5 py-1.5 cursor-grab active:cursor-grabbing select-none group transition-all duration-150 ${itemViolation
+                                  ? "bg-red-500/15 border-red-400/30 hover:bg-red-500/20"
+                                  : "bg-orange-500/20 border-orange-400/30 hover:bg-orange-500/30 hover:border-orange-400/50"
+                                }`}
+                            >
+                              <div className="flex items-start justify-between gap-1">
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="w-4 h-4 text-white/80">
+                                      {getExerciseIcon(item.name, "16")}
                                     </span>
-                                  )}
+                                    <p className="text-white font-medium text-xs leading-snug">
+                                      {item.name}
+                                    </p>
+                                    <span
+                                      className={`shrink-0 inline-block rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none ${item.intensity === "low"
+                                          ? "bg-emerald-500/25 text-emerald-300 ring-1 ring-emerald-400/40"
+                                          : item.intensity === "moderate"
+                                            ? "bg-amber-500/25 text-amber-300 ring-1 ring-amber-400/40"
+                                            : "bg-red-500/25 text-red-300 ring-1 ring-red-400/40"
+                                        }`}
+                                    >
+                                      {item.intensity === "low"
+                                        ? "L"
+                                        : item.intensity === "moderate"
+                                          ? "M"
+                                          : "H"}
+                                    </span>
+                                    {(item.duration.hours || item.duration.minutes) && (
+                                      <span className="shrink-0 inline-block rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] font-medium leading-none text-white/70 ring-1 ring-white/15">
+                                        {item.duration.hours ? `${item.duration.hours}h` : ""}
+                                        {item.duration.hours && item.duration.minutes ? " " : ""}
+                                        {item.duration.minutes ? `${item.duration.minutes}m` : ""}
+                                      </span>
+                                    )}
+                                    {itemViolation && (
+                                      <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-red-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-red-200 ring-1 ring-red-400/40">
+                                          <svg
+                                            className="h-3 w-3"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth="2.5"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                          >
+                                            <path d="M12 9v4" />
+                                            <path d="M12 17h.01" />
+                                            <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                                          </svg>
+                                          !
+                                      </span>
+                                    )}
+                                  </div>
+                                  {itemViolation ? (
+                                    <div className="mt-1 overflow-hidden max-h-0 opacity-0 transition-all duration-200 group-hover:max-h-24 group-hover:opacity-100">
+                                      <div className="rounded-md border border-red-400/30 bg-red-500/10 px-2 py-1.5 text-[11px] leading-snug text-red-200">
+                                        {itemViolation}
+                                      </div>
+                                    </div>
+                                  ) : item.notes ? (
+                                    <p className="text-white/60 text-[11px] mt-0.5 leading-snug">
+                                      {item.notes}
+                                    </p>
+                                  ) : null}
                                 </div>
-                                {item.notes ? (
-                                  <p className="text-white/60 text-[11px] mt-0.5 leading-snug">
-                                    {item.notes}
-                                  </p>
-                                ) : null}
-                              </div>
-                              <div className="shrink-0 flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    openEditPopup(getDateKey(day), item)
-                                  }
-                                  className="rounded p-0.5 hover:bg-blue-500/30 text-white/50 hover:text-blue-300"
-                                  aria-label={`Edit ${item.name}`}
-                                >
-                                  <svg
-                                    className="w-3.5 h-3.5"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2.5"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
+                                <div className="shrink-0 flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      openEditPopup(getDateKey(day), item)
+                                    }
+                                    className="rounded p-0.5 hover:bg-blue-500/30 text-white/50 hover:text-blue-300"
+                                    aria-label={`Edit ${item.name}`}
                                   >
-                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                                  </svg>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    removeCalendarExercise(getDateKey(day), item.id)
-                                  }
-                                  className="rounded p-0.5 hover:bg-red-500/30 text-white/50 hover:text-red-300"
-                                  aria-label={`Remove ${item.name}`}
-                                >
-                                  <svg
-                                    className="w-3.5 h-3.5"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2.5"
-                                    strokeLinecap="round"
+                                    <svg
+                                      className="w-3.5 h-3.5"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2.5"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    >
+                                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                    </svg>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      removeCalendarExercise(getDateKey(day), item.id)
+                                    }
+                                    className="rounded p-0.5 hover:bg-red-500/30 text-white/50 hover:text-red-300"
+                                    aria-label={`Remove ${item.name}`}
                                   >
-                                    <path d="M18 6L6 18M6 6l12 12" />
-                                  </svg>
-                                </button>
+                                    <svg
+                                      className="w-3.5 h-3.5"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2.5"
+                                      strokeLinecap="round"
+                                    >
+                                      <path d="M18 6L6 18M6 6l12 12" />
+                                    </svg>
+                                  </button>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                         {dragOverDate === getDateKey(day) && (
                           <div className="rounded-lg border-2 border-dashed border-blue-400/40 py-3 flex items-center justify-center">
                             <p className="text-blue-300/70 text-xs font-medium">Drop here</p>
