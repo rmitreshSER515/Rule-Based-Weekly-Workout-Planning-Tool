@@ -438,10 +438,6 @@ export default function SchedulePage() {
     () => rules.filter((rule) => selectedRuleIds.includes(rule.id)),
     [rules, selectedRuleIds]
   );
-  const activeRules = useMemo(
-    () => (selectedRules.length > 0 ? selectedRules : rules),
-    [selectedRules, rules]
-  );
 
   const ruleViolations = useMemo(() => {
     if (selectedRules.length === 0) return new Map<string, string>();
@@ -513,7 +509,9 @@ export default function SchedulePage() {
       dateKey: string;
     }): string | null => {
       const normalizedExerciseName = exerciseName.trim().toLowerCase();
-      const relevantRules = activeRules.filter(
+      if (selectedRules.length === 0) return null;
+
+      const relevantRules = selectedRules.filter(
         (rule) => rule.thenRestriction.trim().toLowerCase() === "not allowed"
       );
 
@@ -571,7 +569,7 @@ export default function SchedulePage() {
 
       return null;
     },
-    [calendarExercises, activeRules]
+    [calendarExercises, selectedRules]
   );
 
   const removeCalendarExercise = useCallback((dateKey: string, itemId: string) => {
