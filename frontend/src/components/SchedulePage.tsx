@@ -7,7 +7,42 @@ import { fetchRules, createRule, type RuleDto } from "../api/rules";
 import { fetchSchedule, saveSchedule } from "../api/schedules";
 import { getExerciseIcon } from "../utils/exerciseIcons";
 
-type IntensityLevel = "low" | "moderate" | "high";
+type IntensityLevel = "recovery" | "easy" | "medium" | "hard" | "allOut";
+
+const intensityMeta = (level: IntensityLevel): { label: string; scale: 1 | 2 | 3 | 4 | 5; pillClass: string } => {
+  switch (level) {
+    case "recovery":
+      return {
+        label: "Recovery",
+        scale: 1,
+        pillClass: "bg-emerald-500/20 text-emerald-200 ring-1 ring-emerald-400/30",
+      };
+    case "easy":
+      return {
+        label: "Easy",
+        scale: 2,
+        pillClass: "bg-lime-500/20 text-lime-200 ring-1 ring-lime-400/30",
+      };
+    case "medium":
+      return {
+        label: "Medium",
+        scale: 3,
+        pillClass: "bg-amber-500/20 text-amber-200 ring-1 ring-amber-400/30",
+      };
+    case "hard":
+      return {
+        label: "Hard",
+        scale: 4,
+        pillClass: "bg-orange-500/20 text-orange-200 ring-1 ring-orange-400/30",
+      };
+    case "allOut":
+      return {
+        label: "All-out effort",
+        scale: 5,
+        pillClass: "bg-red-500/20 text-red-200 ring-1 ring-red-400/30",
+      };
+  }
+};
 
 const dateKeyFromDateLocal = (date: Date): string => {
   const year = date.getFullYear();
@@ -22,19 +57,23 @@ const parseDateKeyLocal = (dateKey: string): Date => {
 };
 
 const normalizeIntensity = (value: string): IntensityLevel | null => {
-  switch (value.trim().toLowerCase()) {
-    case "low":
-    case "easy":
-      return "low";
-    case "moderate":
-    case "medium":
-      return "moderate";
-    case "high":
-    case "hard":
-      return "high";
-    default:
-      return null;
+  const normalized = value.trim().toLowerCase();
+
+  if (normalized === "recovery") return "recovery";
+  if (normalized === "easy") return "easy";
+  if (normalized === "medium") return "medium";
+  if (normalized === "hard") return "hard";
+  if (
+    normalized === "all-out effort" ||
+    normalized === "all out effort" ||
+    normalized === "all-out" ||
+    normalized === "all out" ||
+    normalized === "allout"
+  ) {
+    return "allOut";
   }
+
+  return null;
 };
 
 const shiftDateKeyByDays = (dateKey: string, days: number): string => {
@@ -237,7 +276,16 @@ export default function SchedulePage() {
           setStartDate(saved.startDate);
           setEndDate(saved.endDate);
           setSelectedRuleIds(saved.selectedRuleIds ?? []);
-          setCalendarExercises(saved.calendarExercises ?? {});
+          const normalizedCalendarExercises = Object.fromEntries(
+            Object.entries(saved.calendarExercises ?? {}).map(([dateKey, items]) => [
+              dateKey,
+              (items ?? []).map((item) => ({
+                ...item,
+                intensity: normalizeIntensity(String(item.intensity)) ?? "easy",
+              })),
+            ])
+          );
+          setCalendarExercises(normalizedCalendarExercises);
           // set the snapshot AFTER a tick so derived state picks it up
           setTimeout(() => {
             lastSavedSnapshotRef.current = JSON.stringify({
@@ -245,7 +293,7 @@ export default function SchedulePage() {
               startDate: saved.startDate,
               endDate: saved.endDate,
               selectedRuleIds: saved.selectedRuleIds ?? [],
-              calendarExercises: saved.calendarExercises ?? {},
+              calendarExercises: normalizedCalendarExercises,
             });
             setScheduleLoaded(true);
           }, 0);
@@ -294,7 +342,7 @@ export default function SchedulePage() {
   const [pendingDrop, setPendingDrop] = useState<{
     exerciseId: string; name: string; notes: string; targetDateKey: string;
   } | null>(null);
-  const [selectedIntensity, setSelectedIntensity] = useState<IntensityLevel>("low");
+  const [selectedIntensity, setSelectedIntensity] = useState<IntensityLevel>("recovery");
   const [durationHours, setDurationHours] = useState("");
   const [durationMinutes, setDurationMinutes] = useState("");
   const [violationMessage, setViolationMessage] = useState<string | null>(null);
@@ -588,7 +636,7 @@ export default function SchedulePage() {
         setPendingDrop(null);
       }
 
-      setSelectedIntensity("low");
+      setSelectedIntensity("recovery");
       setDurationHours("");
       setDurationMinutes("");
     },
@@ -606,7 +654,7 @@ export default function SchedulePage() {
   const handleIntensityCancel = useCallback(() => {
     setPendingDrop(null);
     setEditingItem(null);
-    setSelectedIntensity("low");
+    setSelectedIntensity("recovery");
     setDurationHours("");
     setDurationMinutes("");
   }, []);
@@ -1181,19 +1229,8 @@ export default function SchedulePage() {
                                     <p className="text-white font-medium text-xs leading-snug">
                                       {item.name}
                                     </p>
-                                    <span
-                                      className={`shrink-0 inline-block rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none ${item.intensity === "low"
-                                          ? "bg-emerald-500/25 text-emerald-300 ring-1 ring-emerald-400/40"
-                                          : item.intensity === "moderate"
-                                            ? "bg-amber-500/25 text-amber-300 ring-1 ring-amber-400/40"
-                                            : "bg-red-500/25 text-red-300 ring-1 ring-red-400/40"
-                                        }`}
-                                    >
-                                      {item.intensity === "low"
-                                        ? "L"
-                                        : item.intensity === "moderate"
-                                          ? "M"
-                                          : "H"}
+                                    <span className={`shrink-0 inline-block rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none ${intensityMeta(item.intensity).pillClass}`}>
+                                      {intensityMeta(item.intensity).scale}
                                     </span>
                                     {(item.duration.hours || item.duration.minutes) && (
                                       <span className="shrink-0 inline-block rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] font-medium leading-none text-white/70 ring-1 ring-white/15">
@@ -1326,14 +1363,20 @@ export default function SchedulePage() {
                     }
                     className="w-full rounded-lg bg-white/10 border border-white/15 text-white px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer"
                   >
-                    <option value="low" className="bg-slate-900 text-white">
-                      🟢 Low
+                    <option value="recovery" className="bg-slate-900 text-white">
+                      1 — Recovery
                     </option>
-                    <option value="moderate" className="bg-slate-900 text-white">
-                      🟡 Moderate
+                    <option value="easy" className="bg-slate-900 text-white">
+                      2 — Easy
                     </option>
-                    <option value="high" className="bg-slate-900 text-white">
-                      🔴 High
+                    <option value="medium" className="bg-slate-900 text-white">
+                      3 — Medium
+                    </option>
+                    <option value="hard" className="bg-slate-900 text-white">
+                      4 — Hard
+                    </option>
+                    <option value="allOut" className="bg-slate-900 text-white">
+                      5 — All-out effort
                     </option>
                   </select>
                 </div>

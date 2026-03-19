@@ -19,7 +19,8 @@ interface RuleData {
   thenRestriction: string;
 }
 
-const exercises = ["Hard", "Easy", "Medium"];
+// Intensity levels (1-5) used across the app
+const exercises = ["Recovery", "Easy", "Medium", "Hard", "All-out effort"];
 const timings = ["the day before", "the day after", "the same day"];
 const restrictions = ["not allowed", "allowed"];
 
