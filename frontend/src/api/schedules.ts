@@ -14,7 +14,8 @@ export type ScheduleDto = {
       exerciseId: string;
       name: string;
       notes: string;
-      intensity: "low" | "moderate" | "high";
+      // Backend may return older or newer intensity strings; normalize in UI.
+      intensity: string;
       duration: { hours: string; minutes: string };
     }[]
   >;
