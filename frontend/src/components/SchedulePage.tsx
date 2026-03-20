@@ -9,6 +9,7 @@ import { getExerciseIcon } from "../utils/exerciseIcons";
 
 type IntensityLevel = "recovery" | "easy" | "medium" | "hard" | "allOut";
 
+
 const intensityMeta = (level: IntensityLevel): { label: string; scale: 1 | 2 | 3 | 4 | 5; pillClass: string } => {
   switch (level) {
     case "recovery":
@@ -116,6 +117,8 @@ export default function SchedulePage() {
   const [ruleModalMode, setRuleModalMode] = useState<"create" | "edit">("create");
   const [editingRule, setEditingRule] = useState<RuleDto | null>(null);
   const [infoRule, setInfoRule] = useState<RuleDto | null>(null);
+  const [isScheduleDropdownOpen, setIsScheduleDropdownOpen] = useState(false);
+  const [availableSchedules, setAvailableSchedules] = useState<string[]>([]);
 
   // Initialize dates for current week
   const today = new Date();
@@ -138,6 +141,7 @@ export default function SchedulePage() {
   const [saveError, setSaveError] = useState("");
   const lastSavedSnapshotRef = useRef<string>("");
   const [scheduleLoaded, setScheduleLoaded] = useState(false);
+  const scheduleDropdownRef = useRef<HTMLDivElement | null>(null);
 
   const handleTitleSave = () => {
     const trimmed = titleDraft.trim();
@@ -259,6 +263,22 @@ export default function SchedulePage() {
     if (!lastSavedSnapshotRef.current) return true; // never saved
     return getCurrentSnapshot() !== lastSavedSnapshotRef.current;
   }, [getCurrentSnapshot, scheduleLoaded]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        scheduleDropdownRef.current &&
+        !scheduleDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsScheduleDropdownOpen(false);
+      }
+    };
+  
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   // Load schedule from DB on mount
   useEffect(() => {
@@ -438,6 +458,10 @@ export default function SchedulePage() {
     () => rules.filter((rule) => selectedRuleIds.includes(rule.id)),
     [rules, selectedRuleIds]
   );
+
+  const scheduleOptions = useMemo(() => {
+    return availableSchedules.filter((name) => name.trim().length > 0);
+  }, [availableSchedules]);
 
   const ruleViolations = useMemo(() => {
     if (selectedRules.length === 0) return new Map<string, string>();
@@ -1021,65 +1045,119 @@ export default function SchedulePage() {
         {/* Header - shrink-0 so it never disappears */}
         <div className="shrink-0 p-4 border-b border-white/15 bg-white/5 backdrop-blur-xl">
           <div className="flex flex-nowrap items-center justify-between gap-4 mb-4">
-            <div className="flex min-w-0 shrink items-center gap-2">
-              {isEditingTitle ? (
-                <div className="flex items-center gap-2 min-w-0">
-                  <input
-                    autoFocus
-                    type="text"
-                    value={titleDraft}
-                    onChange={(e) => setTitleDraft(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleTitleSave();
-                      if (e.key === "Escape") {
-                        if (scheduleTitle) {
-                          setTitleDraft(scheduleTitle);
-                          setIsEditingTitle(false);
-                        }
-                      }
-                    }}
-                    onBlur={handleTitleSave}
-                    placeholder="Name your schedule..."
-                    className="text-2xl font-bold bg-transparent border-b-2 border-white/50 focus:border-white text-white placeholder-white/30 outline-none min-w-0 w-64"
-                  />
-                </div>
-              ) : (
-                <>
-                  <h1
-                    className="truncate text-2xl font-bold text-white cursor-pointer hover:text-white/80 transition-colors"
-                    onClick={() => {
-                      setTitleDraft(scheduleTitle);
-                      setIsEditingTitle(true);
-                    }}
-                    title="Click to rename"
-                  >
-                    {scheduleTitle}
-                  </h1>
-                  <button
-                    onClick={() => {
-                      setTitleDraft(scheduleTitle);
-                      setIsEditingTitle(true);
-                    }}
-                    className="text-white/40 hover:text-white/80 transition-colors"
-                    title="Rename schedule"
-                  >
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                    </svg>
-                  </button>
-                </>
-              )}
+          <div className="flex min-w-0 shrink flex-col items-start gap-2">
+  <div ref={scheduleDropdownRef} className="relative">
+    <button
+      type="button"
+      onClick={() => setIsScheduleDropdownOpen((prev) => !prev)}
+      className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-medium text-white hover:bg-white/15 transition-colors"
+    >
+      <span>Select schedule</span>
+      <svg
+        className={`h-4 w-4 transition-transform ${isScheduleDropdownOpen ? "rotate-180" : ""}`}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="m6 9 6 6 6-6" />
+      </svg>
+    </button>
+
+    {isScheduleDropdownOpen && (
+      <div className="absolute left-0 top-full z-30 mt-2 w-64 overflow-hidden rounded-xl border border-white/15 bg-slate-900 shadow-xl">
+        <div className="border-b border-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white/50">
+          Schedules
+        </div>
+
+        <div className="max-h-64 overflow-y-auto py-1">
+          {scheduleOptions.length > 0 ? (
+            scheduleOptions.map((scheduleName) => (
+              <button
+                key={scheduleName}
+                type="button"
+                onClick={() => setIsScheduleDropdownOpen(false)}
+                className="block w-full px-3 py-2 text-left text-sm text-white/85 hover:bg-white/10 transition-colors"
+              >
+                <span className="truncate block">{scheduleName}</span>
+              </button>
+            ))
+          ) : (
+            <div className="px-3 py-2 text-sm text-white/50">
+              No schedules available
             </div>
+          )}
+        </div>
+      </div>
+    )}
+  </div>
+
+  <div className="flex min-w-0 items-center gap-2">
+    {isEditingTitle ? (
+      <div className="flex items-center gap-2 min-w-0">
+        <input
+          autoFocus
+          type="text"
+          value={titleDraft}
+          onChange={(e) => setTitleDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleTitleSave();
+            if (e.key === "Escape") {
+              if (scheduleTitle) {
+                setTitleDraft(scheduleTitle);
+                setIsEditingTitle(false);
+              }
+            }
+          }}
+          onBlur={handleTitleSave}
+          placeholder="Name your schedule..."
+          className="text-2xl font-bold bg-transparent border-b-2 border-white/50 focus:border-white text-white placeholder-white/30 outline-none min-w-0 w-64"
+        />
+      </div>
+    ) : (
+      <>
+        <h1
+          className="truncate text-2xl font-bold text-white cursor-pointer hover:text-white/80 transition-colors"
+          onClick={() => {
+            setTitleDraft(scheduleTitle);
+            setIsEditingTitle(true);
+          }}
+          title="Click to rename"
+        >
+          {scheduleTitle}
+        </h1>
+        <button
+          onClick={() => {
+            setTitleDraft(scheduleTitle);
+            setIsEditingTitle(true);
+          }}
+          className="text-white/40 hover:text-white/80 transition-colors"
+          title="Rename schedule"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+          </svg>
+        </button>
+      </>
+    )}
+  </div>
+</div>
+
+            {/*till here*/}
+
+
             <div className="shrink-0 flex items-center gap-3">
               {/* Unsaved changes prompt */}
               {hasUnsavedChanges && (
