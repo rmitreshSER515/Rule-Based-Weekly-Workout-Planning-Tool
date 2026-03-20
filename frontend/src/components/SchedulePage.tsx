@@ -4,7 +4,12 @@ import CreateRuleModal from "./CreateRuleModal";
 import { logout } from "../utils/auth";
 import { fetchExercises, createExercise, type ExerciseDto } from "../api/exercises";
 import { fetchRules, createRule, type RuleDto } from "../api/rules";
-import { fetchSchedule, saveSchedule } from "../api/schedules";
+import {
+  fetchSchedule,
+  fetchScheduleById,
+  saveSchedule,
+  type ScheduleDto,
+} from "../api/schedules";
 import { getExerciseIcon } from "../utils/exerciseIcons";
 
 type IntensityLevel = "recovery" | "easy" | "medium" | "hard" | "allOut";
@@ -104,10 +109,14 @@ const formatDayName = (date: Date): string => {
 const EXERCISE_NAME_REGEX = /^[a-zA-Z0-9\s\-']+$/;
 const EXERCISE_NAME_MAX_LENGTH = 25;
 
+type ScheduleLocationState = {
+  mode?: "create" | "view";
+  scheduleId?: string;
+};
+
 export default function SchedulePage() {
   const location = useLocation();
   const navigate = useNavigate();
-  void location;
 
   const handleLogout = () => logout(navigate);
 
@@ -118,7 +127,7 @@ export default function SchedulePage() {
   const [editingRule, setEditingRule] = useState<RuleDto | null>(null);
   const [infoRule, setInfoRule] = useState<RuleDto | null>(null);
   const [isScheduleDropdownOpen, setIsScheduleDropdownOpen] = useState(false);
-  const [availableSchedules, setAvailableSchedules] = useState<string[]>([]);
+  const [availableSchedules] = useState<string[]>([]);
 
   // Initialize dates for current week
   const today = new Date();
@@ -141,7 +150,12 @@ export default function SchedulePage() {
   const [saveError, setSaveError] = useState("");
   const lastSavedSnapshotRef = useRef<string>("");
   const [scheduleLoaded, setScheduleLoaded] = useState(false);
+  /** When set, saves use PUT /schedules/:id; when null, POST creates a new schedule. */
+  const [scheduleId, setScheduleId] = useState<string | null>(null);
   const scheduleDropdownRef = useRef<HTMLDivElement | null>(null);
+
+  const navScheduleId = (location.state as ScheduleLocationState | null)?.scheduleId;
+  const navMode = (location.state as ScheduleLocationState | null)?.mode;
 
   const handleTitleSave = () => {
     const trimmed = titleDraft.trim();
@@ -280,43 +294,69 @@ export default function SchedulePage() {
     };
   }, []);
 
-  // Load schedule from DB on mount
+  // Load schedule from DB: by id from navigation, create mode (empty), or legacy first schedule for user
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
 
+    const applySaved = (saved: ScheduleDto) => {
+      setScheduleId(saved.id);
+      setScheduleTitle(saved.title);
+      setTitleDraft(saved.title);
+      setIsEditingTitle(false);
+      setStartDate(saved.startDate);
+      setEndDate(saved.endDate);
+      setSelectedRuleIds(saved.selectedRuleIds ?? []);
+      const normalizedCalendarExercises = Object.fromEntries(
+        Object.entries(saved.calendarExercises ?? {}).map(([dateKey, items]) => [
+          dateKey,
+          (items ?? []).map((item) => ({
+            ...item,
+            intensity: normalizeIntensity(String(item.intensity)) ?? "easy",
+          })),
+        ])
+      );
+      setCalendarExercises(normalizedCalendarExercises);
+      setTimeout(() => {
+        lastSavedSnapshotRef.current = JSON.stringify({
+          title: saved.title,
+          startDate: saved.startDate,
+          endDate: saved.endDate,
+          selectedRuleIds: saved.selectedRuleIds ?? [],
+          calendarExercises: normalizedCalendarExercises,
+        });
+        setScheduleLoaded(true);
+      }, 0);
+    };
+
     const loadSchedule = async () => {
       try {
+        if (navScheduleId) {
+          const saved = await fetchScheduleById(navScheduleId);
+          if (cancelled) return;
+          if (saved) {
+            if (saved.userId !== userId) {
+              console.warn("Schedule belongs to another user");
+              setScheduleLoaded(true);
+              return;
+            }
+            applySaved(saved);
+          } else {
+            setScheduleLoaded(true);
+          }
+          return;
+        }
+
+        if (navMode === "create") {
+          setScheduleId(null);
+          setScheduleLoaded(true);
+          return;
+        }
+
         const saved = await fetchSchedule(userId);
         if (cancelled) return;
         if (saved) {
-          setScheduleTitle(saved.title);
-          setTitleDraft(saved.title);
-          setIsEditingTitle(false);
-          setStartDate(saved.startDate);
-          setEndDate(saved.endDate);
-          setSelectedRuleIds(saved.selectedRuleIds ?? []);
-          const normalizedCalendarExercises = Object.fromEntries(
-            Object.entries(saved.calendarExercises ?? {}).map(([dateKey, items]) => [
-              dateKey,
-              (items ?? []).map((item) => ({
-                ...item,
-                intensity: normalizeIntensity(String(item.intensity)) ?? "easy",
-              })),
-            ])
-          );
-          setCalendarExercises(normalizedCalendarExercises);
-          // set the snapshot AFTER a tick so derived state picks it up
-          setTimeout(() => {
-            lastSavedSnapshotRef.current = JSON.stringify({
-              title: saved.title,
-              startDate: saved.startDate,
-              endDate: saved.endDate,
-              selectedRuleIds: saved.selectedRuleIds ?? [],
-              calendarExercises: normalizedCalendarExercises,
-            });
-            setScheduleLoaded(true);
-          }, 0);
+          applySaved(saved);
         } else {
           setScheduleLoaded(true);
         }
@@ -328,7 +368,7 @@ export default function SchedulePage() {
 
     loadSchedule();
     return () => { cancelled = true; };
-  }, [userId]);
+  }, [userId, navScheduleId, navMode]);
 
   // Save handler
   const handleSaveChanges = useCallback(async () => {
@@ -338,14 +378,20 @@ export default function SchedulePage() {
     setSaveSuccess(false);
 
     try {
-      await saveSchedule({
-        userId,
-        title: scheduleTitle.trim(),
-        startDate,
-        endDate,
-        selectedRuleIds,
-        calendarExercises,
-      });
+      const saved = await saveSchedule(
+        {
+          userId,
+          title: scheduleTitle.trim(),
+          startDate,
+          endDate,
+          selectedRuleIds,
+          calendarExercises,
+        },
+        scheduleId,
+      );
+      if (saved?.id) {
+        setScheduleId(saved.id);
+      }
       lastSavedSnapshotRef.current = getCurrentSnapshot();
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2500);
@@ -356,7 +402,7 @@ export default function SchedulePage() {
     } finally {
       setIsSaving(false);
     }
-  }, [userId, scheduleTitle, startDate, endDate, selectedRuleIds, calendarExercises, getCurrentSnapshot]);
+  }, [userId, scheduleId, scheduleTitle, startDate, endDate, selectedRuleIds, calendarExercises, getCurrentSnapshot]);
 
   // Intensity & duration popup state
   const [pendingDrop, setPendingDrop] = useState<{

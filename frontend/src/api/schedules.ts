@@ -56,11 +56,36 @@ export async function fetchSchedules(
   return (data ?? []) as ScheduleDto[];
 }
 
+export async function fetchScheduleById(
+  id: string,
+): Promise<ScheduleDto | null> {
+  const res = await fetch(`${API_URL}/schedules/${encodeURIComponent(id)}`, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+  });
+
+  if (res.status === 404) {
+    return null;
+  }
+
+  if (!res.ok) {
+    throw new Error("Failed to load schedule");
+  }
+
+  return (await res.json()) as ScheduleDto;
+}
+
 export async function saveSchedule(
   input: SaveScheduleInput,
+  scheduleId?: string | null,
 ): Promise<ScheduleDto> {
-  const res = await fetch(`${API_URL}/schedules`, {
-    method: "POST",
+  const updating = Boolean(scheduleId);
+  const url = updating
+    ? `${API_URL}/schedules/${encodeURIComponent(scheduleId as string)}`
+    : `${API_URL}/schedules`;
+
+  const res = await fetch(url, {
+    method: updating ? "PUT" : "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
