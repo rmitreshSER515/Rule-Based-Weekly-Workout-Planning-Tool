@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { isValidObjectId, Model } from 'mongoose';
 import { Schedule, ScheduleDocument } from './entities/schedule.schema';
 import type { SaveScheduleDto } from './dto/save-schedule.dto';
 
@@ -11,23 +11,53 @@ export class SchedulesService {
     private readonly scheduleModel: Model<ScheduleDocument>,
   ) {}
 
-  async upsert(dto: SaveScheduleDto): Promise<ScheduleDocument> {
-    return this.scheduleModel.findOneAndUpdate(
-      { userId: dto.userId },
-      {
-        $set: {
-          title: dto.title.trim(),
-          startDate: dto.startDate,
-          endDate: dto.endDate,
-          selectedRuleIds: dto.selectedRuleIds ?? [],
-          calendarExercises: dto.calendarExercises ?? {},
-        },
-      },
-      { upsert: true, new: true, setDefaultsOnInsert: true },
-    );
+  async create(dto: SaveScheduleDto): Promise<ScheduleDocument> {
+    const doc = new this.scheduleModel({
+      userId: dto.userId,
+      title: dto.title.trim(),
+      startDate: dto.startDate,
+      endDate: dto.endDate,
+      selectedRuleIds: dto.selectedRuleIds ?? [],
+      calendarExercises: dto.calendarExercises ?? {},
+    });
+    return doc.save();
   }
 
-  async findByUserId(userId: string): Promise<ScheduleDocument | null> {
-    return this.scheduleModel.findOne({ userId }).exec();
+  async update(
+    id: string,
+    dto: SaveScheduleDto,
+  ): Promise<ScheduleDocument> {
+    if (!isValidObjectId(id)) {
+      throw new NotFoundException('Schedule not found');
+    }
+    const existing = await this.scheduleModel.findById(id).exec();
+    if (!existing) {
+      throw new NotFoundException('Schedule not found');
+    }
+    if (existing.userId !== dto.userId) {
+      throw new ForbiddenException('Cannot update another user schedule');
+    }
+    existing.set({
+      title: dto.title.trim(),
+      startDate: dto.startDate,
+      endDate: dto.endDate,
+      selectedRuleIds: dto.selectedRuleIds ?? [],
+      calendarExercises: dto.calendarExercises ?? {},
+    });
+    return existing.save();
+  }
+
+  async findAllByUserId(userId: string): Promise<ScheduleDocument[]> {
+    return this.scheduleModel
+      .find({ userId })
+      .sort({ updatedAt: -1 })
+      .exec();
+  }
+
+  async findById(id: string): Promise<ScheduleDocument | null> {
+    if (!isValidObjectId(id)) {
+      return null;
+    }
+    return this.scheduleModel.findById(id).exec();
   }
 }
