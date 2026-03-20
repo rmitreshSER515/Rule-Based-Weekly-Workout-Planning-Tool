@@ -169,7 +169,7 @@ export default function RegisterPage() {
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
-
+  
     setTouched({
       firstName: true,
       lastName: true,
@@ -178,14 +178,14 @@ export default function RegisterPage() {
       password: true,
       confirm: true,
     });
-
+  
     if (!validateAll()) return;
-
+  
     try {
       setIsLoading(true);
-
+  
       const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
-
+  
       const response = await fetch(`${API_URL}/auth/register`, {
         method: "POST",
         headers: {
@@ -194,27 +194,23 @@ export default function RegisterPage() {
         body: JSON.stringify({
           firstName: firstName.trim(),
           lastName: lastName.trim(),
-          phoneNumber: countryCode + digitsOnlyPhone(phone), 
+          phoneNumber: countryCode + digitsOnlyPhone(phone),
           email: email.trim(),
           password,
           confirmPassword,
         }),
       });
-
+  
       const data = await response.json();
-
+  
       if (!response.ok) {
         throw new Error(data.message || "Registration failed");
       }
-
-      if (data.accessToken) {
-        localStorage.setItem("token", data.accessToken);
-      }
-      if (data.user) {
-        localStorage.setItem("user", JSON.stringify(data.user));
-      }
-
-      navigate("/");
+  
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+  
+      navigate("/login");
     } catch (error: any) {
       setErrors((prev) => ({
         ...prev,
@@ -535,7 +531,7 @@ export default function RegisterPage() {
 
             <p className="text-center text-sm text-white/70">
               Already have an account?{" "}
-              <Link to="/" className="text-white underline underline-offset-4 hover:opacity-90">
+              <Link to="/login" className="text-white underline underline-offset-4 hover:opacity-90">
                 Sign in
               </Link>
             </p>
