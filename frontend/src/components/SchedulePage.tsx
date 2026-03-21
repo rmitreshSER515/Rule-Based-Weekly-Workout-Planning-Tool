@@ -3,8 +3,13 @@ import { useLocation, useNavigate } from "react-router-dom";
 import CreateRuleModal from "./CreateRuleModal";
 import { logout } from "../utils/auth";
 import { fetchExercises, createExercise, type ExerciseDto } from "../api/exercises";
-import { fetchRules, createRule, updateRule, type RuleDto } from "../api/rules";
-import { fetchSchedule, saveSchedule } from "../api/schedules";
+import { fetchRules, createRule,updateRule type RuleDto } from "../api/rules";
+import {
+  fetchSchedule,
+  fetchScheduleById,
+  saveSchedule,
+  type ScheduleDto,
+} from "../api/schedules";
 import { getExerciseIcon } from "../utils/exerciseIcons";
 
 type IntensityLevel = "recovery" | "easy" | "medium" | "hard" | "allOut";
@@ -104,10 +109,14 @@ const formatDayName = (date: Date): string => {
 const EXERCISE_NAME_REGEX = /^[a-zA-Z0-9\s\-']+$/;
 const EXERCISE_NAME_MAX_LENGTH = 25;
 
+type ScheduleLocationState = {
+  mode?: "create" | "view";
+  scheduleId?: string;
+};
+
 export default function SchedulePage() {
   const location = useLocation();
   const navigate = useNavigate();
-  void location;
 
   const handleLogout = () => logout(navigate);
 
@@ -118,7 +127,7 @@ export default function SchedulePage() {
   const [editingRule, setEditingRule] = useState<RuleDto | null>(null);
   const [infoRule, setInfoRule] = useState<RuleDto | null>(null);
   const [isScheduleDropdownOpen, setIsScheduleDropdownOpen] = useState(false);
-  const [availableSchedules, setAvailableSchedules] = useState<string[]>([]);
+  const [availableSchedules] = useState<string[]>([]);
 
   // Initialize dates for current week
   const today = new Date();
@@ -141,7 +150,12 @@ export default function SchedulePage() {
   const [saveError, setSaveError] = useState("");
   const lastSavedSnapshotRef = useRef<string>("");
   const [scheduleLoaded, setScheduleLoaded] = useState(false);
+  /** When set, saves use PUT /schedules/:id; when null, POST creates a new schedule. */
+  const [scheduleId, setScheduleId] = useState<string | null>(null);
   const scheduleDropdownRef = useRef<HTMLDivElement | null>(null);
+
+  const navScheduleId = (location.state as ScheduleLocationState | null)?.scheduleId;
+  const navMode = (location.state as ScheduleLocationState | null)?.mode;
 
   const handleTitleSave = () => {
     const trimmed = titleDraft.trim();
@@ -280,43 +294,69 @@ export default function SchedulePage() {
     };
   }, []);
 
-  // Load schedule from DB on mount
+  // Load schedule from DB: by id from navigation, create mode (empty), or legacy first schedule for user
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
 
+    const applySaved = (saved: ScheduleDto) => {
+      setScheduleId(saved.id);
+      setScheduleTitle(saved.title);
+      setTitleDraft(saved.title);
+      setIsEditingTitle(false);
+      setStartDate(saved.startDate);
+      setEndDate(saved.endDate);
+      setSelectedRuleIds(saved.selectedRuleIds ?? []);
+      const normalizedCalendarExercises = Object.fromEntries(
+        Object.entries(saved.calendarExercises ?? {}).map(([dateKey, items]) => [
+          dateKey,
+          (items ?? []).map((item) => ({
+            ...item,
+            intensity: normalizeIntensity(String(item.intensity)) ?? "easy",
+          })),
+        ])
+      );
+      setCalendarExercises(normalizedCalendarExercises);
+      setTimeout(() => {
+        lastSavedSnapshotRef.current = JSON.stringify({
+          title: saved.title,
+          startDate: saved.startDate,
+          endDate: saved.endDate,
+          selectedRuleIds: saved.selectedRuleIds ?? [],
+          calendarExercises: normalizedCalendarExercises,
+        });
+        setScheduleLoaded(true);
+      }, 0);
+    };
+
     const loadSchedule = async () => {
       try {
+        if (navScheduleId) {
+          const saved = await fetchScheduleById(navScheduleId);
+          if (cancelled) return;
+          if (saved) {
+            if (saved.userId !== userId) {
+              console.warn("Schedule belongs to another user");
+              setScheduleLoaded(true);
+              return;
+            }
+            applySaved(saved);
+          } else {
+            setScheduleLoaded(true);
+          }
+          return;
+        }
+
+        if (navMode === "create") {
+          setScheduleId(null);
+          setScheduleLoaded(true);
+          return;
+        }
+
         const saved = await fetchSchedule(userId);
         if (cancelled) return;
         if (saved) {
-          setScheduleTitle(saved.title);
-          setTitleDraft(saved.title);
-          setIsEditingTitle(false);
-          setStartDate(saved.startDate);
-          setEndDate(saved.endDate);
-          setSelectedRuleIds(saved.selectedRuleIds ?? []);
-          const normalizedCalendarExercises = Object.fromEntries(
-            Object.entries(saved.calendarExercises ?? {}).map(([dateKey, items]) => [
-              dateKey,
-              (items ?? []).map((item) => ({
-                ...item,
-                intensity: normalizeIntensity(String(item.intensity)) ?? "easy",
-              })),
-            ])
-          );
-          setCalendarExercises(normalizedCalendarExercises);
-          // set the snapshot AFTER a tick so derived state picks it up
-          setTimeout(() => {
-            lastSavedSnapshotRef.current = JSON.stringify({
-              title: saved.title,
-              startDate: saved.startDate,
-              endDate: saved.endDate,
-              selectedRuleIds: saved.selectedRuleIds ?? [],
-              calendarExercises: normalizedCalendarExercises,
-            });
-            setScheduleLoaded(true);
-          }, 0);
+          applySaved(saved);
         } else {
           setScheduleLoaded(true);
         }
@@ -328,7 +368,7 @@ export default function SchedulePage() {
 
     loadSchedule();
     return () => { cancelled = true; };
-  }, [userId]);
+  }, [userId, navScheduleId, navMode]);
 
   // Save handler
   const handleSaveChanges = useCallback(async () => {
@@ -338,14 +378,20 @@ export default function SchedulePage() {
     setSaveSuccess(false);
 
     try {
-      await saveSchedule({
-        userId,
-        title: scheduleTitle.trim(),
-        startDate,
-        endDate,
-        selectedRuleIds,
-        calendarExercises,
-      });
+      const saved = await saveSchedule(
+        {
+          userId,
+          title: scheduleTitle.trim(),
+          startDate,
+          endDate,
+          selectedRuleIds,
+          calendarExercises,
+        },
+        scheduleId,
+      );
+      if (saved?.id) {
+        setScheduleId(saved.id);
+      }
       lastSavedSnapshotRef.current = getCurrentSnapshot();
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2500);
@@ -356,7 +402,7 @@ export default function SchedulePage() {
     } finally {
       setIsSaving(false);
     }
-  }, [userId, scheduleTitle, startDate, endDate, selectedRuleIds, calendarExercises, getCurrentSnapshot]);
+  }, [userId, scheduleId, scheduleTitle, startDate, endDate, selectedRuleIds, calendarExercises, getCurrentSnapshot]);
 
   // Intensity & duration popup state
   const [pendingDrop, setPendingDrop] = useState<{
@@ -518,8 +564,6 @@ export default function SchedulePage() {
     return violations;
   }, [calendarExercises, selectedRules]);
 
-  const hasRuleViolations = ruleViolations.size > 0;
-
   const validateRuleForPlacement = useCallback(
     ({
       itemId,
@@ -623,7 +667,6 @@ export default function SchedulePage() {
 
         if (violation) {
           setViolationMessage(violation);
-          return;
         }
 
         setCalendarExercises((prev) => ({
@@ -645,7 +688,6 @@ export default function SchedulePage() {
 
         if (violation) {
           setViolationMessage(violation);
-          return;
         }
 
         setCalendarExercises((prev) => ({
@@ -1197,7 +1239,7 @@ export default function SchedulePage() {
               <button
                 type="button"
                 onClick={handleSaveChanges}
-                disabled={isSaving || !scheduleTitle.trim() || hasRuleViolations}
+                disabled={isSaving || !scheduleTitle.trim()}
                 className="group relative inline-flex items-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 px-6 py-3 font-semibold text-white shadow-lg shadow-emerald-500/25 transition-all duration-300 hover:shadow-xl hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
               >
                 <span className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />

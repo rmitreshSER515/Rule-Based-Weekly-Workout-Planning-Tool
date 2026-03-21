@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { logout } from "../utils/auth";
-import { fetchSchedule } from "../api/schedules";
+import { fetchSchedules } from "../api/schedules";
 
 type ScheduleCard = {
   id: string;
@@ -35,9 +35,16 @@ export default function FitnessTrackerPage() {
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
-    fetchSchedule(userId).then((data) => {
+    fetchSchedules(userId).then((items) => {
       if (cancelled) return;
-      setSchedules(data ? [{ id: data.id, title: data.title, startDate: data.startDate, endDate: data.endDate }] : []);
+      setSchedules(
+        items.map((item) => ({
+          id: item.id,
+          title: item.title,
+          startDate: item.startDate,
+          endDate: item.endDate,
+        })),
+      );
     }).catch(() => {
       if (!cancelled) setSchedules([]);
     });

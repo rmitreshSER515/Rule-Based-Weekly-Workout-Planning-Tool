@@ -94,10 +94,10 @@ export default function LoginPage() {
     }
   };
 
-  const isFormValid = 
-  emailOrUser.trim() && 
-  password && 
-  !emailError && 
+  const isFormValid =
+  !!emailOrUser.trim() &&
+  !!password &&
+  !emailError &&
   !passwordError;
 
   return (
@@ -130,11 +130,12 @@ export default function LoginPage() {
           <form onSubmit={onSubmit} className="px-8 pb-8 pt-6 space-y-5">
             <div className="relative">
               <input
+                type="email"
                 value={emailOrUser}
                 onChange={(e) => {
                   setEmailOrUser(e.target.value);
                 }}
-                onBlur={() => setTouched({ ...touched, email: true })}
+                onBlur={() => setTouched((prev) => ({ ...prev, email: true }))}
                 placeholder="Email Address"
                 className={`w-full rounded-full bg-white/10 text-white placeholder-white/60 px-5 py-3.5 pr-12 outline-none border ${
                   emailError ? 'border-red-400' : 'border-white/15'
@@ -168,7 +169,7 @@ export default function LoginPage() {
                   onChange={(e) => {
                     setPassword(e.target.value);
                   }}
-                  onBlur={() => setTouched({ ...touched, password: true })}
+                  onBlur={() => setTouched((prev) => ({ ...prev, password: true }))}
                   placeholder="Password"
                   className={`w-full rounded-full bg-white/10 text-white placeholder-white/60 px-5 py-3.5 pr-12 outline-none border ${
                     passwordError ? 'border-red-400' : 'border-white/15'
@@ -176,9 +177,10 @@ export default function LoginPage() {
                 />
                 <button
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  onClick={() => setShowPassword((prev) => !prev)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white"
-                >
+>
                   {showPassword ? (
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                       <path
@@ -224,14 +226,12 @@ export default function LoginPage() {
                 Remember me
               </label>
 
-              <button
-                type="button"
-                className="text-white/75 hover:text-white underline underline-offset-4"
-              >
-                <Link to="/forgot-password" className="text-white/75 hover:text-white underline underline-offset-4">
+              <Link
+  to="/forgot-password"
+  className="text-white/75 hover:text-white underline underline-offset-4"
+>
   Forgot password?
 </Link>
-              </button>
             </div>
 
             <button
