@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import CreateRuleModal from "./CreateRuleModal";
 import { logout } from "../utils/auth";
 import { fetchExercises, createExercise, type ExerciseDto } from "../api/exercises";
-import { fetchRules, createRule,updateRule type RuleDto } from "../api/rules";
+import { fetchRules, createRule, updateRule, type RuleDto } from "../api/rules";
 import {
   fetchSchedule,
   fetchScheduleById,
