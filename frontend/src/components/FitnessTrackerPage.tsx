@@ -20,6 +20,9 @@ export default function FitnessTrackerPage() {
   const [selectedScheduleIds, setSelectedScheduleIds] = useState<string[]>([]);
   const canCompare = selectedScheduleIds.length >= 3;
 
+  
+  const [searchQuery, setSearchQuery] = useState("");
+
   const toggleScheduleSelection = (id: string) => {
     setSelectedScheduleIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
@@ -87,6 +90,20 @@ export default function FitnessTrackerPage() {
     });
   };
 
+  
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const visibleSchedules = schedules
+    .filter((s) => {
+      if (!normalizedQuery) return true;
+      const title = (s.title || "Untitled Schedule").toLowerCase();
+      return title.includes(normalizedQuery);
+    })
+    .sort((a, b) => {
+      const ta = (a.title || "Untitled Schedule").toLowerCase();
+      const tb = (b.title || "Untitled Schedule").toLowerCase();
+      return ta.localeCompare(tb);
+    });
+
   return (
     <div className="min-h-screen w-full relative overflow-hidden bg-slate-950">
       <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-950" />
@@ -148,136 +165,153 @@ export default function FitnessTrackerPage() {
           </div>
 
           <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
-            <div className="flex flex-wrap gap-6">
-              <button
-                type="button"
-                onClick={handleCreateSchedule}
-                className="group relative flex h-[320px] w-[280px] shrink-0 flex-col items-center justify-center rounded-2xl border border-white/15 bg-white/10 p-6 text-center shadow-[0_12px_30px_rgba(0,0,0,0.25)] transition-all duration-300 hover:-translate-y-1 hover:border-blue-400/40 hover:bg-white/15 hover:shadow-[0_18px_40px_rgba(37,99,235,0.18)]"
-              >
-                <div className="mb-6 flex h-28 w-28 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-white/60 transition-colors group-hover:text-blue-300">
-                  <svg
-                    width="62"
-                    height="62"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M12 5v14" />
-                    <path d="M5 12h14" />
-                  </svg>
-                </div>
-
-                <h2 className="text-2xl font-bold text-white">Create New Schedule</h2>
-                <p className="mt-3 max-w-[200px] text-sm leading-6 text-white/60">
-                  Start building a new fitness schedule from scratch.
-                </p>
-
-                <div className="absolute bottom-0 right-0 h-10 w-10 overflow-hidden">
-                  <div className="absolute bottom-0 right-0 h-10 w-10 border-l border-t border-white/10 bg-white/10 [clip-path:polygon(100%_0,0_100%,100%_100%)]" />
-                </div>
-              </button>
-
-              {schedules.length > 0 ? (
-                schedules.map((schedule) => {
-                  const isSelected = selectedScheduleIds.includes(schedule.id);
-
-                  return (
-                    <button
-                      key={schedule.id}
-                      type="button"
-                      onClick={() => handleOpenSchedule(schedule)}
-                      className={`group relative flex h-[320px] w-[280px] shrink-0 flex-col rounded-2xl border bg-white/10 p-5 text-left shadow-[0_12px_30px_rgba(0,0,0,0.25)] transition-all duration-300 hover:-translate-y-1 hover:bg-white/15
-                        ${
-                          isSelected
-                            ? "border-blue-400/50 ring-2 ring-blue-400/30"
-                            : "border-white/15 hover:border-cyan-400/40 hover:shadow-[0_18px_40px_rgba(34,211,238,0.16)]"
-                        }`}
+           
+            <div className="flex gap-6">
+              {/* LEFT: Cards */}
+              <div className="flex flex-wrap gap-6">
+                
+                <button
+                  type="button"
+                  onClick={handleCreateSchedule}
+                  className="group relative flex h-[320px] w-[280px] shrink-0 flex-col items-center justify-center rounded-2xl border border-white/15 bg-white/10 p-6 text-center shadow-[0_12px_30px_rgba(0,0,0,0.25)] transition-all duration-300 hover:-translate-y-1 hover:border-blue-400/40 hover:bg-white/15 hover:shadow-[0_18px_40px_rgba(37,99,235,0.18)]"
+                >
+                  <div className="mb-6 flex h-28 w-28 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-white/60 transition-colors group-hover:text-blue-300">
+                    <svg
+                      width="62"
+                      height="62"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
                     >
-                     
+                      <path d="M12 5v14" />
+                      <path d="M5 12h14" />
+                    </svg>
+                  </div>
+
+                  <h2 className="text-2xl font-bold text-white">
+                    Create New Schedule
+                  </h2>
+                  <p className="mt-3 max-w-[200px] text-sm leading-6 text-white/60">
+                    Start building a new fitness schedule from scratch.
+                  </p>
+
+                  <div className="absolute bottom-0 right-0 h-10 w-10 overflow-hidden">
+                    <div className="absolute bottom-0 right-0 h-10 w-10 border-l border-t border-white/10 bg-white/10 [clip-path:polygon(100%_0,0_100%,100%_100%)]" />
+                  </div>
+                </button>
+
+            
+                {visibleSchedules.length > 0 ? (
+                  visibleSchedules.map((schedule) => {
+                    const isSelected = selectedScheduleIds.includes(schedule.id);
+
+                    return (
                       <button
+                        key={schedule.id}
                         type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          toggleScheduleSelection(schedule.id);
-                        }}
-                        className={`absolute right-4 top-4 z-10 inline-flex h-10 w-10 items-center justify-center rounded-xl border backdrop-blur-xl transition-colors
+                        onClick={() => handleOpenSchedule(schedule)}
+                        className={`group relative flex h-[320px] w-[280px] shrink-0 flex-col rounded-2xl border bg-white/10 p-5 text-left shadow-[0_12px_30px_rgba(0,0,0,0.25)] transition-all duration-300 hover:-translate-y-1 hover:bg-white/15
                           ${
                             isSelected
-                              ? "border-blue-400/50 bg-blue-500/25 text-white"
-                              : "border-white/15 bg-white/5 text-white/60 hover:bg-white/10"
+                              ? "border-blue-400/50 ring-2 ring-blue-400/30"
+                              : "border-white/15 hover:border-cyan-400/40 hover:shadow-[0_18px_40px_rgba(34,211,238,0.16)]"
                           }`}
-                        aria-label={`Select ${schedule.title ?? "schedule"} for compare`}
-                        title={isSelected ? "Selected" : "Select for compare"}
                       >
-                        <svg
-                          width="18"
-                          height="18"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2.2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
+                        
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            toggleScheduleSelection(schedule.id);
+                          }}
+                          className={`absolute right-4 top-4 z-10 inline-flex h-10 w-10 items-center justify-center rounded-xl border backdrop-blur-xl transition-colors
+                            ${
+                              isSelected
+                                ? "border-blue-400/50 bg-blue-500/25 text-white"
+                                : "border-white/15 bg-white/5 text-white/60 hover:bg-white/10"
+                            }`}
+                          aria-label={`Select ${schedule.title ?? "schedule"} for compare`}
+                          title={isSelected ? "Selected" : "Select for compare"}
                         >
-                          <path d="M20 6 9 17l-5-5" />
-                        </svg>
+                          <svg
+                            width="18"
+                            height="18"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M20 6 9 17l-5-5" />
+                          </svg>
+                        </button>
+
+                        <div className="mb-4 border-b border-white/10 pb-4 pr-12">
+                          <h3 className="line-clamp-2 text-2xl font-bold leading-tight text-white">
+                            {schedule.title || "Untitled Schedule"}
+                          </h3>
+                        </div>
+
+                        <div className="flex-1 space-y-3 text-sm text-white/75">
+                          {schedule.startDate || schedule.endDate ? (
+                            <div>
+                              <p className="text-white/50">Date Range</p>
+                              <p className="mt-1 font-medium text-white">
+                                {schedule.startDate || "—"}{" "}
+                                <span className="text-white/50">to</span>{" "}
+                                {schedule.endDate || "—"}
+                              </p>
+                            </div>
+                          ) : (
+                            <p className="text-white/50">No details available yet.</p>
+                          )}
+                        </div>
+
+                        <div className="mt-5 border-t border-white/10 pt-4 text-sm font-medium text-cyan-200 transition-colors group-hover:text-white">
+                          Open Schedule
+                        </div>
+
+                        <div className="absolute bottom-0 right-0 h-10 w-10 overflow-hidden">
+                          <div className="absolute bottom-0 right-0 h-10 w-10 border-l border-t border-white/10 bg-white/10 [clip-path:polygon(100%_0,0_100%,100%_100%)]" />
+                        </div>
                       </button>
-
-                      
-                      <div className="mb-4 border-b border-white/10 pb-4 pr-12">
-                        <h3 className="line-clamp-2 text-2xl font-bold leading-tight text-white">
-                          {schedule.title || "Untitled Schedule"}
-                        </h3>
-                      </div>
-
-                      <div className="flex-1 space-y-3 text-sm text-white/75">
-                        {schedule.startDate || schedule.endDate ? (
-                          <div>
-                            <p className="text-white/50">Date Range</p>
-                            <p className="mt-1 font-medium text-white">
-                              {schedule.startDate || "—"}{" "}
-                              <span className="text-white/50">to</span>{" "}
-                              {schedule.endDate || "—"}
-                            </p>
-                          </div>
-                        ) : null}
-
-                        {!schedule.startDate && !schedule.endDate && (
-                          <p className="text-white/50">No details available yet.</p>
-                        )}
-                      </div>
-
-                      <div className="mt-5 border-t border-white/10 pt-4 text-sm font-medium text-cyan-200 transition-colors group-hover:text-white">
-                        Open Schedule
-                      </div>
-
-                      <div className="absolute bottom-0 right-0 h-10 w-10 overflow-hidden">
-                        <div className="absolute bottom-0 right-0 h-10 w-10 border-l border-t border-white/10 bg-white/10 [clip-path:polygon(100%_0,0_100%,100%_100%)]" />
-                      </div>
-                    </button>
-                  );
-                })
-              ) : (
-                <div className="flex h-[320px] min-w-[280px] flex-1 items-center justify-center rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-8 text-center">
-                  <div>
-                    <p className="text-lg font-semibold text-white/75">
-                      No schedules created yet
-                    </p>
-                    <p className="mt-2 text-sm text-white/50">
-                      Your saved schedules will appear here once they are available.
-                    </p>
+                    );
+                  })
+                ) : (
+                  <div className="flex h-[320px] w-[280px] shrink-0 items-center justify-center rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-8 text-center">
+                    <div>
+                      <p className="text-lg font-semibold text-white/75">
+                        No matching schedules
+                      </p>
+                      <p className="mt-2 text-sm text-white/50">
+                        Try a different title search.
+                      </p>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
+
+             
+              <div className="relative flex-1 min-w-[420px] rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl">
+                <input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search schedules..."
+                  className="absolute right-6 top-6 w-[280px] rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-white/40 outline-none backdrop-blur-xl focus:border-white/30 focus:ring-2 focus:ring-white/10"
+                />
+              </div>
             </div>
 
             <div className="mt-6 text-sm text-white/50">
               Selected for compare:{" "}
-              <span className="text-white/80 font-medium">{selectedScheduleIds.length}</span>{" "}
+              <span className="text-white/80 font-medium">
+                {selectedScheduleIds.length}
+              </span>{" "}
               (need 3+)
             </div>
           </div>
