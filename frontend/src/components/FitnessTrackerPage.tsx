@@ -17,7 +17,6 @@ export default function FitnessTrackerPage() {
   const [schedules, setSchedules] = useState<ScheduleCard[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
 
-
   const [selectedScheduleIds, setSelectedScheduleIds] = useState<string[]>([]);
   const canCompare = selectedScheduleIds.length >= 3;
 
@@ -67,7 +66,6 @@ export default function FitnessTrackerPage() {
     };
   }, [userId]);
 
-  
   useEffect(() => {
     const ids = new Set(schedules.map((s) => s.id));
     setSelectedScheduleIds((prev) => prev.filter((id) => ids.has(id)));
@@ -91,7 +89,6 @@ export default function FitnessTrackerPage() {
 
   return (
     <div className="min-h-screen w-full relative overflow-hidden bg-slate-950">
-     
       <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-950" />
       <div className="absolute -top-32 -left-32 h-[520px] w-[520px] rounded-full bg-fuchsia-500/20 blur-[90px]" />
       <div className="absolute -bottom-40 -right-40 h-[620px] w-[620px] rounded-full bg-cyan-400/15 blur-[110px]" />
@@ -106,7 +103,6 @@ export default function FitnessTrackerPage() {
 
       <div className="relative z-10 min-h-screen px-6 py-8">
         <div className="mx-auto max-w-7xl">
-          
           <div className="mb-8 border-b border-white/15 pb-6">
             <div className="flex items-center justify-between gap-4">
               <div className="w-full text-center">
@@ -119,7 +115,6 @@ export default function FitnessTrackerPage() {
               </div>
 
               <div className="absolute right-6 top-8 flex items-center gap-3">
-                
                 <button
                   type="button"
                   disabled={!canCompare}
@@ -152,10 +147,8 @@ export default function FitnessTrackerPage() {
             </div>
           </div>
 
-         
           <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
             <div className="flex flex-wrap gap-6">
-              
               <button
                 type="button"
                 onClick={handleCreateSchedule}
@@ -203,40 +196,42 @@ export default function FitnessTrackerPage() {
                             : "border-white/15 hover:border-cyan-400/40 hover:shadow-[0_18px_40px_rgba(34,211,238,0.16)]"
                         }`}
                     >
-                      <div className="mb-4 flex items-start justify-between gap-3 border-b border-white/10 pb-4">
+                     
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          toggleScheduleSelection(schedule.id);
+                        }}
+                        className={`absolute right-4 top-4 z-10 inline-flex h-10 w-10 items-center justify-center rounded-xl border backdrop-blur-xl transition-colors
+                          ${
+                            isSelected
+                              ? "border-blue-400/50 bg-blue-500/25 text-white"
+                              : "border-white/15 bg-white/5 text-white/60 hover:bg-white/10"
+                          }`}
+                        aria-label={`Select ${schedule.title ?? "schedule"} for compare`}
+                        title={isSelected ? "Selected" : "Select for compare"}
+                      >
+                        <svg
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M20 6 9 17l-5-5" />
+                        </svg>
+                      </button>
+
+                      
+                      <div className="mb-4 border-b border-white/10 pb-4 pr-12">
                         <h3 className="line-clamp-2 text-2xl font-bold leading-tight text-white">
                           {schedule.title || "Untitled Schedule"}
                         </h3>
-
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            toggleScheduleSelection(schedule.id);
-                          }}
-                          className={`mt-1 shrink-0 rounded-lg border p-2 transition-colors
-                            ${
-                              isSelected
-                                ? "border-blue-400/50 bg-blue-500/25 text-white"
-                                : "border-white/15 bg-white/5 text-white/60 hover:bg-white/10"
-                            }`}
-                          aria-label={`Select ${schedule.title ?? "schedule"} for compare`}
-                          title={isSelected ? "Selected" : "Select for compare"}
-                        >
-                          <svg
-                            width="18"
-                            height="18"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2.2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <path d="M20 6 9 17l-5-5" />
-                          </svg>
-                        </button>
                       </div>
 
                       <div className="flex-1 space-y-3 text-sm text-white/75">
@@ -280,7 +275,6 @@ export default function FitnessTrackerPage() {
               )}
             </div>
 
-            
             <div className="mt-6 text-sm text-white/50">
               Selected for compare:{" "}
               <span className="text-white/80 font-medium">{selectedScheduleIds.length}</span>{" "}
