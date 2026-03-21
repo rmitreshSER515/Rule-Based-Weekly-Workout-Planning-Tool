@@ -358,6 +358,15 @@ export default function SchedulePage() {
         if (saved) {
           applySaved(saved);
         } else {
+          // No saved schedule — set baseline snapshot to current defaults
+          // so "Unsaved changes" only appears after the user actually changes something
+          lastSavedSnapshotRef.current = JSON.stringify({
+            title: "",
+            startDate,
+            endDate,
+            selectedRuleIds: [],
+            calendarExercises: {},
+          });
           setScheduleLoaded(true);
         }
       } catch (err) {
