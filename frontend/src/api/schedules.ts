@@ -33,6 +33,13 @@ export type SaveScheduleInput = {
 export async function fetchSchedule(
   userId: string,
 ): Promise<ScheduleDto | null> {
+  const items = await fetchSchedules(userId);
+  return items[0] ?? null;
+}
+
+export async function fetchSchedules(
+  userId: string,
+): Promise<ScheduleDto[]> {
   const url = new URL("/schedules", API_URL);
   url.searchParams.set("userId", userId);
 
@@ -42,11 +49,11 @@ export async function fetchSchedule(
   });
 
   if (!res.ok) {
-    throw new Error("Failed to load schedule");
+    throw new Error("Failed to load schedules");
   }
 
   const data = await res.json();
-  return data ?? null;
+  return (data ?? []) as ScheduleDto[];
 }
 
 export async function saveSchedule(
