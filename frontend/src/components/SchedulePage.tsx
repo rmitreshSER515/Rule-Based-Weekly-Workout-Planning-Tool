@@ -564,8 +564,6 @@ export default function SchedulePage() {
     return violations;
   }, [calendarExercises, selectedRules]);
 
-  const hasRuleViolations = ruleViolations.size > 0;
-
   const validateRuleForPlacement = useCallback(
     ({
       itemId,
@@ -669,7 +667,6 @@ export default function SchedulePage() {
 
         if (violation) {
           setViolationMessage(violation);
-          return;
         }
 
         setCalendarExercises((prev) => ({
@@ -691,7 +688,6 @@ export default function SchedulePage() {
 
         if (violation) {
           setViolationMessage(violation);
-          return;
         }
 
         setCalendarExercises((prev) => ({
@@ -1241,7 +1237,7 @@ export default function SchedulePage() {
               <button
                 type="button"
                 onClick={handleSaveChanges}
-                disabled={isSaving || !scheduleTitle.trim() || hasRuleViolations}
+                disabled={isSaving || !scheduleTitle.trim()}
                 className="group relative inline-flex items-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 px-6 py-3 font-semibold text-white shadow-lg shadow-emerald-500/25 transition-all duration-300 hover:shadow-xl hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
               >
                 <span className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
