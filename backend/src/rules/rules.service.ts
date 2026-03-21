@@ -14,6 +14,57 @@ export class RulesService {
   ) {}
 
   async create(dto: CreateRuleDto): Promise<RuleDocument> {
+    const derived = this.buildDerivedFields(dto);
+
+    const doc = new this.ruleModel({
+      userId: dto.userId,
+      name: dto.name.trim(),
+      ifExercise: dto.ifExercise,
+      ifActivityType: dto.ifActivityType,
+      ifTiming: dto.ifTiming,
+      thenExercise: dto.thenExercise,
+      thenActivityType: dto.thenActivityType,
+      thenRestriction: dto.thenRestriction,
+      ...derived,
+      isActive: dto.isActive ?? true,
+    });
+
+    return doc.save();
+  }
+
+  async update(id: string, dto: CreateRuleDto): Promise<RuleDocument | null> {
+    const derived = this.buildDerivedFields(dto);
+
+    return this.ruleModel
+      .findOneAndUpdate(
+        { _id: id, userId: dto.userId },
+        {
+          $set: {
+            name: dto.name.trim(),
+            ifExercise: dto.ifExercise,
+            ifActivityType: dto.ifActivityType,
+            ifTiming: dto.ifTiming,
+            thenExercise: dto.thenExercise,
+            thenActivityType: dto.thenActivityType,
+            thenRestriction: dto.thenRestriction,
+            ...derived,
+            isActive: dto.isActive ?? true,
+          },
+        },
+        {
+          new: true,
+          runValidators: true,
+        },
+      )
+      .exec();
+  }
+
+  private buildDerivedFields(dto: CreateRuleDto): {
+    ifCondition: Condition;
+    whenCondition: WhenCondition;
+    thenCondition: Condition;
+    action: 'notAllowed';
+  } {
     const whenCondition: WhenCondition =
       dto.ifTiming === 'the same day'
         ? { type: 'sameDay' }
@@ -31,23 +82,12 @@ export class RulesService {
       value: dto.thenActivityType,
     };
 
-    const doc = new this.ruleModel({
-      userId: dto.userId,
-      name: dto.name.trim(),
-      ifExercise: dto.ifExercise,
-      ifActivityType: dto.ifActivityType,
-      ifTiming: dto.ifTiming,
-      thenExercise: dto.thenExercise,
-      thenActivityType: dto.thenActivityType,
-      thenRestriction: dto.thenRestriction,
+    return {
       ifCondition,
       whenCondition,
       thenCondition,
       action: dto.thenRestriction === 'not allowed' ? 'notAllowed' : 'notAllowed',
-      isActive: dto.isActive ?? true,
-    });
-
-    return doc.save();
+    };
   }
 
   async findByUserId(userId: string): Promise<RuleDocument[]> {

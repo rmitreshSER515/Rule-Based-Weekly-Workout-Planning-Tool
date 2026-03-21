@@ -60,3 +60,21 @@ export async function createRule(input: CreateRuleInput): Promise<RuleDto> {
   return data as RuleDto;
 }
 
+export async function updateRule(id: string, input: CreateRuleInput): Promise<RuleDto> {
+  const res = await fetch(`${API_URL}/rules/${id}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input),
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data?.message ?? "Failed to update rule");
+  }
+
+  return data as RuleDto;
+}
+

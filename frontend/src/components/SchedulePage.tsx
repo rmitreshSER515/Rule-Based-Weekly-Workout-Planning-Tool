@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import CreateRuleModal from "./CreateRuleModal";
 import { logout } from "../utils/auth";
 import { fetchExercises, createExercise, type ExerciseDto } from "../api/exercises";
-import { fetchRules, createRule, type RuleDto } from "../api/rules";
+import { fetchRules, createRule,updateRule type RuleDto } from "../api/rules";
 import {
   fetchSchedule,
   fetchScheduleById,
@@ -885,7 +885,7 @@ export default function SchedulePage() {
   };
 
   const handleEditRuleSave = async (ruleData: RuleData) => {
-    if (!editingRule) return;
+    if (!editingRule || !userId) return;
 
     const { duplicateName, duplicateCriteria } = findDuplicateRule(ruleData, editingRule.id);
     if (duplicateName) {
@@ -897,16 +897,18 @@ export default function SchedulePage() {
       return;
     }
 
-    setRules((prev) =>
-      prev.map((r) =>
-        r.id === editingRule.id
-          ? {
-              ...r,
-              ...ruleData,
-            }
-          : r
-      )
-    );
+    try {
+      const updated = await updateRule(editingRule.id, {
+        userId,
+        ...ruleData,
+      });
+
+      setRules((prev) => prev.map((r) => (r.id === editingRule.id ? updated : r)));
+    } catch (err) {
+      console.error("Failed to update rule", err);
+      alert("Failed to update rule. Please try again.");
+      return;
+    }
 
     setEditingRule(null);
     setRuleModalMode("create");

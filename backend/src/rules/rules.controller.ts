@@ -1,4 +1,15 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  NotFoundException,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 
 import { RulesService } from './rules.service';
 import { CreateRuleDto } from './dto/create-rule.dto';
@@ -11,6 +22,30 @@ export class RulesController {
   @HttpCode(HttpStatus.CREATED)
   async create(@Body() dto: CreateRuleDto) {
     const rule = await this.rulesService.create(dto);
+
+    return {
+      id: rule._id.toString(),
+      userId: rule.userId,
+      name: rule.name,
+      ifExercise: rule.ifExercise,
+      ifActivityType: rule.ifActivityType,
+      ifTiming: rule.ifTiming,
+      thenExercise: rule.thenExercise,
+      thenActivityType: rule.thenActivityType,
+      thenRestriction: rule.thenRestriction,
+      isActive: rule.isActive,
+      createdAt: rule.get('createdAt'),
+      updatedAt: rule.get('updatedAt'),
+    };
+  }
+
+  @Patch(':id')
+  async update(@Param('id') id: string, @Body() dto: CreateRuleDto) {
+    const rule = await this.rulesService.update(id, dto);
+
+    if (!rule) {
+      throw new NotFoundException('Rule not found');
+    }
 
     return {
       id: rule._id.toString(),
