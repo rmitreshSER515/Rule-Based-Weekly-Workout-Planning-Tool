@@ -136,7 +136,7 @@ export default function FitnessTrackerPage() {
                   type="button"
                   disabled={!canCompare}
                   onClick={() => {
-                    console.log("Compare schedules clicked:", selectedScheduleIds);
+                    navigate("/compare", { state: { selectedScheduleIds } });
                   }}
                   title={
                     canCompare
