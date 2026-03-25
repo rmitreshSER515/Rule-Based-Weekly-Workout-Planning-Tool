@@ -7,6 +7,7 @@ import { fetchRules, createRule, updateRule, type RuleDto } from "../api/rules";
 import {
   fetchSchedule,
   fetchScheduleById,
+  fetchSchedules,
   saveSchedule,
   type ScheduleDto,
 } from "../api/schedules";
@@ -127,7 +128,9 @@ export default function SchedulePage() {
   const [editingRule, setEditingRule] = useState<RuleDto | null>(null);
   const [infoRule, setInfoRule] = useState<RuleDto | null>(null);
   const [isScheduleDropdownOpen, setIsScheduleDropdownOpen] = useState(false);
-  const [availableSchedules] = useState<string[]>([]);
+  const [availableSchedules, setAvailableSchedules] = useState<
+  { id: string; title: string }[]
+>([]);
 
   // Initialize dates for current week
   const today = new Date();
@@ -248,7 +251,85 @@ export default function SchedulePage() {
     };
   }, [userId]);
 
-  // Drag-and-drop state
+  const applySavedSchedule = useCallback((saved: ScheduleDto) => {
+    setScheduleId(saved.id);
+    setScheduleTitle(saved.title);
+    setTitleDraft(saved.title);
+    setIsEditingTitle(false);
+    setStartDate(saved.startDate);
+    setEndDate(saved.endDate);
+    setSelectedRuleIds(saved.selectedRuleIds ?? []);
+  
+    const normalizedCalendarExercises = Object.fromEntries(
+      Object.entries(saved.calendarExercises ?? {}).map(([dateKey, items]) => [
+        dateKey,
+        (items ?? []).map((item) => ({
+          ...item,
+          intensity: normalizeIntensity(String(item.intensity)) ?? "easy",
+        })),
+      ])
+    );
+  
+    setCalendarExercises(normalizedCalendarExercises);
+  
+    const snapshot = JSON.stringify({
+      title: saved.title,
+      startDate: saved.startDate,
+      endDate: saved.endDate,
+      selectedRuleIds: saved.selectedRuleIds ?? [],
+      calendarExercises: normalizedCalendarExercises,
+    });
+  
+    lastSavedSnapshotRef.current = snapshot;
+    setScheduleLoaded(true);
+  }, []);
+
+  const loadScheduleBySelection = useCallback(
+    async (selectedScheduleId: string) => {
+      try {
+        const saved = await fetchScheduleById(selectedScheduleId);
+        if (!saved) return;
+  
+        if (saved.userId !== userId) {
+          console.warn("Schedule belongs to another user");
+          return;
+        }
+  
+        applySavedSchedule(saved);
+        setIsScheduleDropdownOpen(false);
+      } catch (err) {
+        console.error("Failed to load selected schedule", err);
+      }
+    },
+    [userId, applySavedSchedule]
+  );
+
+  const loadSchedulesForDropdown = useCallback(async () => {
+    if (!userId) {
+      setAvailableSchedules([]);
+      return;
+    }
+  
+    try {
+      const items = await fetchSchedules(userId);
+  
+      setAvailableSchedules(
+        items.map((item) => ({
+          id: item.id,
+          title: item.title?.trim() || "Untitled Schedule",
+        }))
+      );
+    } catch (err) {
+      console.error("Failed to load schedules for dropdown", err);
+      setAvailableSchedules([]);
+    }
+  }, [userId]);
+  
+  useEffect(() => {
+    loadSchedulesForDropdown();
+  }, [loadSchedulesForDropdown]);
+
+    // Drag-and-drop state
   const [calendarExercises, setCalendarExercises] = useState<
     Record<string, {
       id: string;
@@ -299,35 +380,6 @@ export default function SchedulePage() {
     if (!userId) return;
     let cancelled = false;
 
-    const applySaved = (saved: ScheduleDto) => {
-      setScheduleId(saved.id);
-      setScheduleTitle(saved.title);
-      setTitleDraft(saved.title);
-      setIsEditingTitle(false);
-      setStartDate(saved.startDate);
-      setEndDate(saved.endDate);
-      setSelectedRuleIds(saved.selectedRuleIds ?? []);
-      const normalizedCalendarExercises = Object.fromEntries(
-        Object.entries(saved.calendarExercises ?? {}).map(([dateKey, items]) => [
-          dateKey,
-          (items ?? []).map((item) => ({
-            ...item,
-            intensity: normalizeIntensity(String(item.intensity)) ?? "easy",
-          })),
-        ])
-      );
-      setCalendarExercises(normalizedCalendarExercises);
-      setTimeout(() => {
-        lastSavedSnapshotRef.current = JSON.stringify({
-          title: saved.title,
-          startDate: saved.startDate,
-          endDate: saved.endDate,
-          selectedRuleIds: saved.selectedRuleIds ?? [],
-          calendarExercises: normalizedCalendarExercises,
-        });
-        setScheduleLoaded(true);
-      }, 0);
-    };
 
     const loadSchedule = async () => {
       try {
@@ -340,7 +392,7 @@ export default function SchedulePage() {
               setScheduleLoaded(true);
               return;
             }
-            applySaved(saved);
+            applySavedSchedule(saved);
           } else {
             setScheduleLoaded(true);
           }
@@ -356,7 +408,7 @@ export default function SchedulePage() {
         const saved = await fetchSchedule(userId);
         if (cancelled) return;
         if (saved) {
-          applySaved(saved);
+          applySavedSchedule(saved);
         } else {
           // No saved schedule — set baseline snapshot to current defaults
           // so "Unsaved changes" only appears after the user actually changes something
@@ -377,7 +429,7 @@ export default function SchedulePage() {
 
     loadSchedule();
     return () => { cancelled = true; };
-  }, [userId, navScheduleId, navMode]);
+  }, [userId, navScheduleId, navMode, applySavedSchedule]);
 
   // Save handler
   const handleSaveChanges = useCallback(async () => {
@@ -401,6 +453,7 @@ export default function SchedulePage() {
       if (saved?.id) {
         setScheduleId(saved.id);
       }
+      await loadSchedulesForDropdown();
       lastSavedSnapshotRef.current = getCurrentSnapshot();
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2500);
@@ -411,7 +464,17 @@ export default function SchedulePage() {
     } finally {
       setIsSaving(false);
     }
-  }, [userId, scheduleId, scheduleTitle, startDate, endDate, selectedRuleIds, calendarExercises, getCurrentSnapshot]);
+  }, [
+    userId,
+    scheduleId,
+    scheduleTitle,
+    startDate,
+    endDate,
+    selectedRuleIds,
+    calendarExercises,
+    getCurrentSnapshot,
+    loadSchedulesForDropdown,
+  ]);
 
   // Intensity & duration popup state
   const [pendingDrop, setPendingDrop] = useState<{
@@ -515,7 +578,7 @@ export default function SchedulePage() {
   );
 
   const scheduleOptions = useMemo(() => {
-    return availableSchedules.filter((name) => name.trim().length > 0);
+    return availableSchedules;
   }, [availableSchedules]);
 
   const ruleViolations = useMemo(() => {
@@ -1094,57 +1157,118 @@ export default function SchedulePage() {
       </div>
 
       {/* Right Side - Calendar */}
-      <div className="relative z-10 flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="relative z-10 flex-1 flex flex-col min-w-0 overflow-visible">
         {/* Header - shrink-0 so it never disappears */}
-        <div className="shrink-0 p-4 border-b border-white/15 bg-white/5 backdrop-blur-xl">
+        <div className="relative z-30 shrink-0 overflow-visible p-4 border-b border-white/15 bg-white/5 backdrop-blur-xl">
           <div className="flex flex-nowrap items-center justify-between gap-4 mb-4">
           <div className="flex min-w-0 shrink flex-col items-start gap-2">
   <div ref={scheduleDropdownRef} className="relative">
-    <button
-      type="button"
-      onClick={() => setIsScheduleDropdownOpen((prev) => !prev)}
-      className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-medium text-white hover:bg-white/15 transition-colors"
-    >
-      <span>Select schedule</span>
-      <svg
-        className={`h-4 w-4 transition-transform ${isScheduleDropdownOpen ? "rotate-180" : ""}`}
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="m6 9 6 6 6-6" />
-      </svg>
-    </button>
+  <button
+  type="button"
+  onClick={() => setIsScheduleDropdownOpen((prev) => !prev)}
+  className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-medium text-white hover:bg-white/15 transition-colors"
+>
+  <svg
+    className="h-3.5 w-3.5 text-white/50"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+    <line x1="16" y1="2" x2="16" y2="6" />
+    <line x1="8" y1="2" x2="8" y2="6" />
+    <line x1="3" y1="10" x2="21" y2="10" />
+  </svg>
+  <span className="max-w-[160px] truncate">
+  Select schedule
+  </span>
+  <svg
+    className={`h-4 w-4 text-white/50 transition-transform duration-200 ${isScheduleDropdownOpen ? "rotate-180" : ""}`}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="m6 9 6 6 6-6" />
+  </svg>
+</button>
 
-    {isScheduleDropdownOpen && (
-      <div className="absolute left-0 top-full z-30 mt-2 w-64 overflow-hidden rounded-xl border border-white/15 bg-slate-900 shadow-xl">
-        <div className="border-b border-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white/50">
-          Schedules
-        </div>
-
-        <div className="max-h-64 overflow-y-auto py-1">
-          {scheduleOptions.length > 0 ? (
-            scheduleOptions.map((scheduleName) => (
-              <button
-                key={scheduleName}
-                type="button"
-                onClick={() => setIsScheduleDropdownOpen(false)}
-                className="block w-full px-3 py-2 text-left text-sm text-white/85 hover:bg-white/10 transition-colors"
-              >
-                <span className="truncate block">{scheduleName}</span>
-              </button>
-            ))
-          ) : (
-            <div className="px-3 py-2 text-sm text-white/50">
-              No schedules available
-            </div>
-          )}
-        </div>
+{isScheduleDropdownOpen && (
+  <div className="absolute top-full left-0 mt-2 z-[100] w-80 max-h-[min(28rem,calc(100vh-10rem))] rounded-2xl border border-white/15 bg-slate-900/95 backdrop-blur-xl shadow-2xl shadow-black/40 overflow-hidden flex flex-col">
+    {availableSchedules.length === 0 ? (
+      <div className="px-4 py-5 text-center">
+        <p className="text-white/40 text-sm">No saved schedules yet</p>
       </div>
+    ) : (
+      <ul className="flex-1 py-1.5 overflow-y-auto overscroll-contain scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+        {availableSchedules.map((schedule) => {
+          const isActive = schedule.id === scheduleId;
+          return (
+            <li key={schedule.id}>
+              <button
+                type="button"
+                onClick={() => loadScheduleBySelection(schedule.id)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors duration-150 ${
+                  isActive
+                    ? "bg-indigo-500/20 text-white"
+                    : "text-white/70 hover:bg-white/[0.08] hover:text-white"
+                }`}
+              >
+                {isActive ? (
+                  <svg
+                    className="h-3.5 w-3.5 shrink-0 text-indigo-400"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                ) : (
+                  <span className="h-3.5 w-3.5 shrink-0" />
+                )}
+                <span className="truncate font-medium">{schedule.title}</span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
     )}
+    <div className="border-t border-white/10 px-3 py-2">
+      <button
+        type="button"
+        onClick={() => {
+          setIsScheduleDropdownOpen(false);
+          navigate("/fitness", { state: { openCreate: true } });
+        }}
+        className="w-full flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-white/50 hover:text-white hover:bg-white/[0.08] transition-colors"
+      >
+        <svg
+          className="h-3.5 w-3.5"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+        <span>New schedule</span>
+      </button>
+    </div>
+  </div>
+)}
+
+    
   </div>
 
   <div className="flex min-w-0 items-center gap-2">
@@ -1796,3 +1920,5 @@ export default function SchedulePage() {
     </div>
   );
 }
+
+
