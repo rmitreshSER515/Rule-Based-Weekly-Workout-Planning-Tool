@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import CreateRuleModal from "./CreateRuleModal";
 import { logout } from "../utils/auth";
-import { fetchExercises, createExercise, type ExerciseDto } from "../api/exercises";
+import { fetchExercises, createExercise, deleteExercise, type ExerciseDto } from "../api/exercises";
 import { fetchRules, createRule, updateRule, type RuleDto } from "../api/rules";
 import {
   fetchSchedule,
@@ -577,9 +577,6 @@ export default function SchedulePage() {
     [rules, selectedRuleIds]
   );
 
-  const scheduleOptions = useMemo(() => {
-    return availableSchedules;
-  }, [availableSchedules]);
 
   const ruleViolations = useMemo(() => {
     if (selectedRules.length === 0) return new Map<string, string>();
@@ -876,6 +873,40 @@ export default function SchedulePage() {
       setAddExerciseNameError(err?.message ?? "Failed to create exercise");
     }
   };
+  const handleDeleteExercise = useCallback(
+  async (exerciseId: string) => {
+    if (!userId) return;
+
+    const targetExercise = exercises.find((ex) => ex.id === exerciseId);
+    if (!targetExercise) return;
+
+    const confirmed = window.confirm(
+      `Delete "${targetExercise.name}"? This will also remove it from the calendar.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await deleteExercise(exerciseId, userId);
+
+      setExercises((prev) => prev.filter((ex) => ex.id !== exerciseId));
+
+      setCalendarExercises((prev) => {
+        const next: typeof prev = {};
+
+        for (const [dateKey, items] of Object.entries(prev)) {
+          next[dateKey] = items.filter((item) => item.exerciseId !== exerciseId);
+        }
+
+        return next;
+      });
+    } catch (err) {
+      console.error("Failed to delete exercise", err);
+      alert("Failed to delete exercise. Please try again.");
+    }
+  },
+  [userId, exercises, setCalendarExercises]
+);
 
   const days = useMemo(() => {
     const start = parseDateKeyLocal(startDate);
@@ -1035,38 +1066,68 @@ export default function SchedulePage() {
           </div>
           <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-2">
             {exercises.length > 0 ? exercises.map((ex) => (
-              <div
-                key={ex.id}
-                draggable
-                onDragStart={(e) => handleSidebarDragStart(e, ex)}
-                className="rounded-lg bg-orange-500/20 border border-orange-400/30 px-3 py-2 cursor-grab active:cursor-grabbing select-none transition-all duration-150 hover:bg-orange-500/30 hover:border-orange-400/50 hover:shadow-lg hover:shadow-orange-500/10"
-              >
-                <div className="flex items-start gap-2">
-                  {/* Grip handle */}
-                  <svg
-                    className="w-4 h-4 mt-0.5 shrink-0 text-white/40"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                  >
-                    <circle cx="9" cy="5" r="1.5" />
-                    <circle cx="15" cy="5" r="1.5" />
-                    <circle cx="9" cy="12" r="1.5" />
-                    <circle cx="15" cy="12" r="1.5" />
-                    <circle cx="9" cy="19" r="1.5" />
-                    <circle cx="15" cy="19" r="1.5" />
-                  </svg>
-                  <span className="w-5 h-5 mt-0.5 text-white/80">
-                    {getExerciseIcon(ex.name, "20")}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-white font-medium text-sm">{ex.name}</p>
-                    {ex.notes ? (
-                      <p className="text-white/70 text-xs mt-1">{ex.notes}</p>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-            )) : (
+  <div
+    key={ex.id}
+    draggable
+    onDragStart={(e) => handleSidebarDragStart(e, ex)}
+    className="group rounded-lg bg-orange-500/20 border border-orange-400/30 px-3 py-2 cursor-grab active:cursor-grabbing select-none transition-all duration-150 hover:bg-orange-500/30 hover:border-orange-400/50 hover:shadow-lg hover:shadow-orange-500/10"
+  >
+    <div className="flex items-start justify-between gap-2">
+      <div className="flex items-start gap-2 min-w-0 flex-1">
+        <svg
+          className="w-4 h-4 mt-0.5 shrink-0 text-white/40"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+        >
+          <circle cx="9" cy="5" r="1.5" />
+          <circle cx="15" cy="5" r="1.5" />
+          <circle cx="9" cy="12" r="1.5" />
+          <circle cx="15" cy="12" r="1.5" />
+          <circle cx="9" cy="19" r="1.5" />
+          <circle cx="15" cy="19" r="1.5" />
+        </svg>
+        <span className="w-5 h-5 mt-0.5 shrink-0 text-white/80">
+          {getExerciseIcon(ex.name, "20")}
+        </span>
+        <div className="min-w-0">
+          <p className="text-white font-medium text-sm">{ex.name}</p>
+          {ex.notes ? (
+            <p className="text-white/70 text-xs mt-1">{ex.notes}</p>
+          ) : null}
+        </div>
+      </div>
+
+      <button
+        type="button"
+        draggable={false}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          void handleDeleteExercise(ex.id);
+        }}
+        className="shrink-0 rounded-md p-1 text-white/40 hover:text-red-300 hover:bg-red-500/20 opacity-0 group-hover:opacity-100 transition-all"
+        aria-label={`Delete ${ex.name}`}
+        title="Delete exercise"
+      >
+        <svg
+          className="w-4 h-4"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <polyline points="3 6 5 6 21 6" />
+          <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+          <line x1="10" y1="11" x2="10" y2="17" />
+          <line x1="14" y1="11" x2="14" y2="17" />
+        </svg>
+      </button>
+    </div>
+  </div>
+)) : (
               <p className="text-white/50 text-sm">No exercises yet. Add one to get started.</p>
             )}
           </div>
