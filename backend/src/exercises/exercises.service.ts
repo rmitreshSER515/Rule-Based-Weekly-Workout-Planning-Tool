@@ -1,4 +1,4 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Exercise, ExerciseDocument } from './entities/exercise.schema';
@@ -40,5 +40,21 @@ export class ExercisesService {
       .find({ userId })
       .sort({ createdAt: 1 })
       .exec();
+  }
+
+  async delete(id: string, userId: string): Promise<ExerciseDocument> {
+    const exercise = await this.exerciseModel.findById(id).exec();
+
+    if (!exercise) {
+      throw new NotFoundException('Exercise not found');
+    }
+
+    if (!userId || exercise.userId !== userId) {
+      throw new ForbiddenException('Not allowed to delete this exercise');
+    }
+
+    await this.exerciseModel.deleteOne({ _id: id }).exec();
+
+    return exercise;
   }
 }

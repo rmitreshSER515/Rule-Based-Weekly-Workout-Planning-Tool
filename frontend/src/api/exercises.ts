@@ -48,3 +48,27 @@ export async function createExercise(input: {
   return data as ExerciseDto;
 }
 
+export async function deleteExercise(exerciseId: string, userId: string): Promise<void> {
+  const url = new URL(`/exercises/${exerciseId}`, API_URL);
+  url.searchParams.set("userId", userId);
+
+  const res = await fetch(url.toString(), {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!res.ok) {
+    let message = "Failed to delete exercise";
+
+    try {
+      const data = await res.json();
+      message = data?.message ?? message;
+    } catch {
+    }
+
+    throw new Error(message);
+  }
+}
+
