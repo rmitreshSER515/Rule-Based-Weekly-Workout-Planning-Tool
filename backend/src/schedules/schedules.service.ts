@@ -1,15 +1,31 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { isValidObjectId, Model } from 'mongoose';
 import { Schedule, ScheduleDocument } from './entities/schedule.schema';
 import type { SaveScheduleDto } from './dto/save-schedule.dto';
 
 @Injectable()
-export class SchedulesService {
+export class SchedulesService implements OnModuleInit {
   constructor(
     @InjectModel(Schedule.name)
     private readonly scheduleModel: Model<ScheduleDocument>,
   ) {}
+
+  async onModuleInit() {
+    const collection = this.scheduleModel.collection;
+    try {
+      await collection.dropIndex('userId_1');
+    } catch (err: any) {
+      if (err?.codeName !== 'IndexNotFound') {
+        console.warn('Failed to drop schedules userId index', err);
+      }
+    }
+    try {
+      await collection.createIndex({ userId: 1 });
+    } catch (err) {
+      console.warn('Failed to ensure schedules userId index', err);
+    }
+  }
 
   async create(dto: SaveScheduleDto): Promise<ScheduleDocument> {
     const doc = new this.scheduleModel({
