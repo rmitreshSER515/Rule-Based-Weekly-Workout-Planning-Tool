@@ -1,6 +1,11 @@
 import { useState, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { fetchSchedules, type ScheduleDto } from "../api/schedules";
+import {
+  fetchScheduleMetrics,
+  type ScheduleMetrics,
+  type ExerciseIntensitySummary,
+} from "../api/metrics";
 
 /* ── intensity helpers (same 5-level scale used in SchedulePage) ── */
 type IntensityLevel = "recovery" | "easy" | "medium" | "hard" | "allOut";
@@ -182,6 +187,12 @@ export default function CompareSchedulesPage() {
   const [allSchedules, setAllSchedules] = useState<ScheduleDto[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>(passedIds);
   const [loading, setLoading] = useState(true);
+  const [metricsByScheduleId, setMetricsByScheduleId] = useState<
+    Record<string, ScheduleMetrics>
+  >({});
+  const [openIntensityKeys, setOpenIntensityKeys] = useState<Set<string>>(
+    () => new Set()
+  );
 
   // Section toggle state
   const [exercisesExpanded, setExercisesExpanded] = useState(true);
@@ -222,6 +233,46 @@ export default function CompareSchedulesPage() {
     [allSchedules, selectedIds]
   );
 
+  // Load metrics for selected schedules
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      if (selectedSchedules.length === 0) {
+        setMetricsByScheduleId({});
+        return;
+      }
+
+      const entries = await Promise.all(
+        selectedSchedules.map(async (schedule) => {
+          try {
+            const data = await fetchScheduleMetrics(schedule.id);
+            return [schedule.id, data.metrics] as const;
+          } catch (err) {
+            console.error("Failed to load metrics for schedule", schedule.id, err);
+            return null;
+          }
+        })
+      );
+
+      if (cancelled) return;
+
+      const next: Record<string, ScheduleMetrics> = {};
+      for (const entry of entries) {
+        if (entry) {
+          next[entry[0]] = entry[1];
+        }
+      }
+      setMetricsByScheduleId(next);
+    };
+
+    load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedSchedules]);
+
   const statsMap = useMemo(() => {
     const map = new Map<string, ScheduleStats>();
     for (const s of selectedSchedules) {
@@ -229,6 +280,56 @@ export default function CompareSchedulesPage() {
     }
     return map;
   }, [selectedSchedules]);
+
+  const intensityBreakdownBySchedule = useMemo(() => {
+    const map = new Map<
+      string,
+      Record<IntensityLevel, ExerciseIntensitySummary[]>
+    >();
+
+    for (const schedule of selectedSchedules) {
+      const metrics = metricsByScheduleId[schedule.id];
+      const buckets: Record<IntensityLevel, ExerciseIntensitySummary[]> = {
+        recovery: [],
+        easy: [],
+        medium: [],
+        hard: [],
+        allOut: [],
+      };
+
+      if (metrics?.exerciseIntensityBreakdown) {
+        for (const entry of metrics.exerciseIntensityBreakdown) {
+          const level = entry.intensity as IntensityLevel;
+          if (buckets[level]) {
+            buckets[level].push(entry);
+          }
+        }
+      }
+
+      for (const level of INTENSITY_LEVELS) {
+        buckets[level].sort((a, b) => {
+          if (b.count !== a.count) return b.count - a.count;
+          return a.name.localeCompare(b.name);
+        });
+      }
+
+      map.set(schedule.id, buckets);
+    }
+
+    return map;
+  }, [metricsByScheduleId, selectedSchedules]);
+
+  const toggleIntensityDropdown = (key: string) => {
+    setOpenIntensityKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
 
   /* ── Row rendering helpers ── */
   const renderLabelRow = (
@@ -450,12 +551,50 @@ export default function CompareSchedulesPage() {
                           </div>
                           {selectedSchedules.map((s) => {
                             const stats = statsMap.get(s.id);
+                            const breakdown =
+                              intensityBreakdownBySchedule.get(s.id)?.[level] ?? [];
+                            const dropdownKey = `${s.id}:${level}`;
+                            const isOpen = openIntensityKeys.has(dropdownKey);
                             return (
                               <div
                                 key={s.id}
-                                className="flex items-center justify-center px-4 py-2.5 text-sm text-white/80 border-b border-white/5 border-l border-l-white/5"
+                                className="flex flex-col items-center justify-center gap-2 px-4 py-2.5 text-sm text-white/80 border-b border-white/5 border-l border-l-white/5"
                               >
-                                {stats?.exerciseCounts[level] ?? 0}
+                                <span className="text-sm font-semibold">
+                                  {stats?.exerciseCounts[level] ?? 0}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => toggleIntensityDropdown(dropdownKey)}
+                                  className="rounded-lg border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/80 hover:bg-white/10 transition-colors"
+                                >
+                                  {isOpen ? "Hide exercises" : "Show exercises"}
+                                </button>
+                                {isOpen && (
+                                  <div className="w-full rounded-lg border border-white/10 bg-white/5 px-2.5 py-2 text-[11px] text-white/80">
+                                    {breakdown.length === 0 ? (
+                                      <div className="text-white/50 text-xs">
+                                        No exercises in this intensity
+                                      </div>
+                                    ) : (
+                                      <ul className="space-y-1">
+                                        {breakdown.map((item) => (
+                                          <li
+                                            key={`${item.name}-${item.intensity}`}
+                                            className="flex items-center justify-between gap-2"
+                                          >
+                                            <span className="truncate">
+                                              {item.name}
+                                            </span>
+                                            <span className="text-white/60">
+                                              {item.count}
+                                            </span>
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             );
                           })}
