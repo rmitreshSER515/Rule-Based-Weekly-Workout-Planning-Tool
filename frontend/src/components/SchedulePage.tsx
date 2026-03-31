@@ -155,6 +155,9 @@ export default function SchedulePage() {
   const [saveError, setSaveError] = useState("");
   const lastSavedSnapshotRef = useRef<string>("");
   const [scheduleLoaded, setScheduleLoaded] = useState(false);
+  const [dismissedRecoveryRecommendations, setDismissedRecoveryRecommendations] = useState<
+    Set<string>
+  >(() => new Set());
   /** When set, saves use PUT /schedules/:id; when null, POST creates a new schedule. */
   const [scheduleId, setScheduleId] = useState<string | null>(null);
   const scheduleDropdownRef = useRef<HTMLDivElement | null>(null);
@@ -962,8 +965,10 @@ export default function SchedulePage() {
       }
     }
 
-    return recommendations;
-  }, [days, calendarExercises]);
+    return recommendations.filter(
+      (rec) => !dismissedRecoveryRecommendations.has(rec.dateKey)
+    );
+  }, [days, calendarExercises, dismissedRecoveryRecommendations]);
 
   const applyRecoveryRecommendation = useCallback((dateKey: string) => {
     setCalendarExercises((prev) => {
@@ -991,6 +996,14 @@ export default function SchedulePage() {
           intensity: "recovery",
         })),
       };
+    });
+  }, []);
+
+  const dismissRecoveryRecommendation = useCallback((dateKey: string) => {
+    setDismissedRecoveryRecommendations((prev) => {
+      const next = new Set(prev);
+      next.add(dateKey);
+      return next;
     });
   }, []);
 
@@ -1576,14 +1589,34 @@ export default function SchedulePage() {
                       key={rec.dateKey}
                       className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border border-white/10 bg-white/5 px-3.5 py-3"
                     >
-                      <div className="text-sm text-white/80">{rec.message}</div>
-                      <button
-                        type="button"
-                        onClick={() => applyRecoveryRecommendation(rec.dateKey)}
-                        className="shrink-0 rounded-lg bg-emerald-500/20 text-emerald-200 border border-emerald-400/30 px-3 py-1.5 text-xs font-semibold hover:bg-emerald-500/30 transition-colors"
-                      >
-                        Apply
-                      </button>
+                      <div className="flex-1 text-sm text-white/80">{rec.message}</div>
+                      <div className="shrink-0 flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => applyRecoveryRecommendation(rec.dateKey)}
+                          className="rounded-lg bg-emerald-500/20 text-emerald-200 border border-emerald-400/30 px-3 py-1.5 text-xs font-semibold hover:bg-emerald-500/30 transition-colors"
+                        >
+                          Apply
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => dismissRecoveryRecommendation(rec.dateKey)}
+                          className="inline-flex items-center justify-center rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-xs text-white/70 hover:bg-white/10 transition-colors"
+                          aria-label="Dismiss recommendation"
+                          title="Dismiss recommendation"
+                        >
+                          <svg
+                            className="h-3.5 w-3.5"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
+                          >
+                            <path d="M18 6L6 18M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
