@@ -15,6 +15,8 @@ import { getExerciseIcon } from "../utils/exerciseIcons";
 
 type IntensityLevel = "recovery" | "easy" | "medium" | "hard" | "allOut";
 
+const HIGH_INTENSITY_LEVELS = new Set<IntensityLevel>(["hard", "allOut"]);
+const RECOVERY_STREAK_THRESHOLD = 3;
 
 const intensityMeta = (level: IntensityLevel): { label: string; scale: 1 | 2 | 3 | 4 | 5; pillClass: string } => {
   switch (level) {
@@ -922,6 +924,76 @@ export default function SchedulePage() {
     return result;
   }, [days]);
 
+  const recoveryRecommendations = useMemo(() => {
+    if (days.length === 0) return [];
+
+    let streak = 0;
+    const recommendations: { dateKey: string; message: string }[] = [];
+    const seen = new Set<string>();
+
+    for (let i = 0; i < days.length; i += 1) {
+      const dateKey = getDateKey(days[i]);
+      const items = calendarExercises[dateKey] || [];
+      const isHighDay = items.some((item) =>
+        HIGH_INTENSITY_LEVELS.has(item.intensity)
+      );
+
+      if (isHighDay) {
+        streak += 1;
+      } else {
+        streak = 0;
+      }
+
+      if (isHighDay && streak === RECOVERY_STREAK_THRESHOLD) {
+        const targetIndex = i + 1;
+        if (targetIndex < days.length) {
+          const targetKey = getDateKey(days[targetIndex]);
+          const targetItems = calendarExercises[targetKey] || [];
+          const hasRecovery = targetItems.some((item) => item.intensity === "recovery");
+          if (!hasRecovery && !seen.has(targetKey)) {
+            const targetLabel = formatDayName(days[targetIndex]);
+            recommendations.push({
+              dateKey: targetKey,
+              message: `You have ${RECOVERY_STREAK_THRESHOLD} high-intensity days in a row. Consider a recovery day on ${targetLabel}.`,
+            });
+            seen.add(targetKey);
+          }
+        }
+      }
+    }
+
+    return recommendations;
+  }, [days, calendarExercises]);
+
+  const applyRecoveryRecommendation = useCallback((dateKey: string) => {
+    setCalendarExercises((prev) => {
+      const items = prev[dateKey] || [];
+      if (items.length === 0) {
+        return {
+          ...prev,
+          [dateKey]: [
+            {
+              id: crypto.randomUUID(),
+              exerciseId: "recovery",
+              name: "Recovery",
+              notes: "Auto-suggested recovery day",
+              intensity: "recovery",
+              duration: { hours: "", minutes: "" },
+            },
+          ],
+        };
+      }
+
+      return {
+        ...prev,
+        [dateKey]: items.map((item) => ({
+          ...item,
+          intensity: "recovery",
+        })),
+      };
+    });
+  }, []);
+
   const toggleRuleSelection = (ruleId: string) => {
     setSelectedRuleIds((prev) =>
       prev.includes(ruleId) ? prev.filter((id) => id !== ruleId) : [...prev, ruleId]
@@ -1485,6 +1557,39 @@ export default function SchedulePage() {
 
         {/* Calendar Grid - one week visible per scroll, 7 days fit equally */}
         <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
+          {recoveryRecommendations.length > 0 && (
+            <div className="mx-auto w-full max-w-[1280px] px-4 pt-4">
+              <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h3 className="text-white font-semibold text-sm">
+                      Recovery recommendations
+                    </h3>
+                    <p className="text-white/60 text-xs mt-1">
+                      Suggested based on {RECOVERY_STREAK_THRESHOLD} consecutive high-intensity days.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 space-y-3">
+                  {recoveryRecommendations.map((rec) => (
+                    <div
+                      key={rec.dateKey}
+                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border border-white/10 bg-white/5 px-3.5 py-3"
+                    >
+                      <div className="text-sm text-white/80">{rec.message}</div>
+                      <button
+                        type="button"
+                        onClick={() => applyRecoveryRecommendation(rec.dateKey)}
+                        className="shrink-0 rounded-lg bg-emerald-500/20 text-emerald-200 border border-emerald-400/30 px-3 py-1.5 text-xs font-semibold hover:bg-emerald-500/30 transition-colors"
+                      >
+                        Apply
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
           <div
             className="schedule-calendar-scroll mx-auto flex-1 min-h-0 w-full max-w-[1280px] overflow-x-auto overflow-y-hidden scroll-smooth [container-type:inline-size]"
             style={{
@@ -1981,5 +2086,3 @@ export default function SchedulePage() {
     </div>
   );
 }
-
-
