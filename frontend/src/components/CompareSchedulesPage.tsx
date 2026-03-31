@@ -7,7 +7,7 @@ import {
   type ExerciseIntensitySummary,
 } from "../api/metrics";
 
-/* ── intensity helpers (same 5-level scale used in SchedulePage) ── */
+
 type IntensityLevel = "recovery" | "easy" | "medium" | "hard" | "allOut";
 
 const INTENSITY_LEVELS: IntensityLevel[] = [
@@ -56,10 +56,10 @@ const normalizeIntensity = (value: string): IntensityLevel => {
     n === "all out effort"
   )
     return "allOut";
-  return "easy"; // fallback
+  return "easy"; 
 };
 
-/* ── helpers ── */
+
 const parseDateLocal = (s: string): Date => {
   const [y, m, d] = s.split("-").map(Number);
   return new Date(y, m - 1, d);
@@ -74,15 +74,16 @@ const dateKeyFromDate = (d: Date): string => {
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-/* ── stats computation ── */
+
 interface ScheduleStats {
   exerciseCounts: Record<IntensityLevel, number>;
   totalExercises: number;
   totalMinutes: number;
   perDayMinutes: { label: string; minutes: number }[];
-  averageIntensity: number; // 1-5 scale
+  averageIntensity: number; 
   averageIntensityLabel: string;
   restDays: number;
+  intensityDays: number; 
 }
 
 function computeStats(schedule: ScheduleDto): ScheduleStats {
@@ -99,7 +100,7 @@ function computeStats(schedule: ScheduleDto): ScheduleStats {
   let intensitySum = 0;
   let exerciseCount = 0;
 
-  // Build per-day map
+
   const start = parseDateLocal(schedule.startDate);
   const end = parseDateLocal(schedule.endDate);
   const perDayMap = new Map<string, number>();
@@ -129,7 +130,7 @@ function computeStats(schedule: ScheduleDto): ScheduleStats {
     }
   }
 
-  // Per-day breakdown
+  
   const perDayMinutes: { label: string; minutes: number }[] = [];
   for (const [key, mins] of perDayMap) {
     const d = parseDateLocal(key);
@@ -139,7 +140,7 @@ function computeStats(schedule: ScheduleDto): ScheduleStats {
     });
   }
 
-  // Average intensity
+  
   const avgNum = exerciseCount > 0 ? intensitySum / exerciseCount : 0;
   let avgLabel = "—";
   if (exerciseCount > 0) {
@@ -150,11 +151,25 @@ function computeStats(schedule: ScheduleDto): ScheduleStats {
     avgLabel = found ? intensityLabel[found] : "—";
   }
 
-  // Rest days: days within range with 0 exercises
+ 
   let restDays = 0;
+  let intensityDays = 0; 
+  
   for (const [dateKey] of perDayMap) {
     const items = cal[dateKey] ?? [];
-    if (items.length === 0) restDays++;
+    if (items.length === 0) {
+      restDays++;
+    } else {
+      
+      const hasHighIntensity = items.some((item) => {
+        const level = normalizeIntensity(String(item.intensity));
+        return level === "hard" || level === "allOut";
+      });
+      
+      if (hasHighIntensity) {
+        intensityDays++;
+      }
+    }
   }
 
   return {
@@ -165,6 +180,7 @@ function computeStats(schedule: ScheduleDto): ScheduleStats {
     averageIntensity: avgNum,
     averageIntensityLabel: avgLabel,
     restDays,
+    intensityDays, 
   };
 }
 
@@ -176,7 +192,7 @@ const formatTime = (minutes: number): string => {
   return `${h}h ${m}m`;
 };
 
-/* ── Component ── */
+
 export default function CompareSchedulesPage() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -187,18 +203,17 @@ export default function CompareSchedulesPage() {
   const [allSchedules, setAllSchedules] = useState<ScheduleDto[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>(passedIds);
   const [loading, setLoading] = useState(true);
-  const [metricsByScheduleId, setMetricsByScheduleId] = useState<
-    Record<string, ScheduleMetrics>
-  >({});
+  const [metricsByScheduleId, setMetricsByScheduleId] =
+  useState<Record<string, ScheduleMetrics>>({});
   const [openIntensityKeys, setOpenIntensityKeys] = useState<Set<string>>(
     () => new Set()
   );
 
-  // Section toggle state
+  
   const [exercisesExpanded, setExercisesExpanded] = useState(true);
   const [timeExpanded, setTimeExpanded] = useState(false);
 
-  // Load all schedules for this user
+ 
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
@@ -233,7 +248,7 @@ export default function CompareSchedulesPage() {
     [allSchedules, selectedIds]
   );
 
-  // Load metrics for selected schedules
+  
   useEffect(() => {
     let cancelled = false;
 
@@ -282,10 +297,10 @@ export default function CompareSchedulesPage() {
   }, [selectedSchedules]);
 
   const intensityBreakdownBySchedule = useMemo(() => {
-    const map = new Map<
-      string,
-      Record<IntensityLevel, ExerciseIntensitySummary[]>
-    >();
+  const map = new Map<
+    string,
+    Record<IntensityLevel, ExerciseIntensitySummary[]>
+  >();
 
     for (const schedule of selectedSchedules) {
       const metrics = metricsByScheduleId[schedule.id];
@@ -361,7 +376,7 @@ export default function CompareSchedulesPage() {
     </div>
   );
 
-  /* grid template: labels col + 1 col per schedule */
+
   const gridCols = `minmax(220px, 260px) repeat(${selectedSchedules.length}, minmax(140px, 1fr))`;
 
   return (
@@ -641,7 +656,7 @@ export default function CompareSchedulesPage() {
                     {/* Per-day sub-rows */}
                     {timeExpanded &&
                       (() => {
-                        // Use the first selected schedule's day count for labels
+                        
                         const firstStats = statsMap.get(
                           selectedSchedules[0]?.id
                         );
@@ -683,6 +698,13 @@ export default function CompareSchedulesPage() {
                     {renderLabelRow(
                       "Rest Days",
                       (s) => s.restDays,
+                      true
+                    )}
+
+                    {/* ─── Intensity Days ─── ADDED */}
+                    {renderLabelRow(
+                      "Intensity Days",
+                      (s) => s.intensityDays,
                       true
                     )}
                   </div>
