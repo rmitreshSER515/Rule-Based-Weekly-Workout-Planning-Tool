@@ -153,7 +153,7 @@ export default function SchedulePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState("");
-  const lastSavedSnapshotRef = useRef<string>("");
+  const [lastSavedSnapshot, setLastSavedSnapshot] = useState<string>("");
   const [scheduleLoaded, setScheduleLoaded] = useState(false);
   const [dismissedRecoveryRecommendations, setDismissedRecoveryRecommendations] = useState<
     Set<string>
@@ -285,7 +285,7 @@ export default function SchedulePage() {
       calendarExercises: normalizedCalendarExercises,
     });
   
-    lastSavedSnapshotRef.current = snapshot;
+    setLastSavedSnapshot(snapshot);
     setScheduleLoaded(true);
   }, []);
 
@@ -360,9 +360,9 @@ export default function SchedulePage() {
 
   const hasUnsavedChanges = useMemo(() => {
     if (!scheduleLoaded) return false;
-    if (!lastSavedSnapshotRef.current) return true; // never saved
-    return getCurrentSnapshot() !== lastSavedSnapshotRef.current;
-  }, [getCurrentSnapshot, scheduleLoaded]);
+    if (!lastSavedSnapshot) return true; // never saved
+    return getCurrentSnapshot() !== lastSavedSnapshot;
+  }, [getCurrentSnapshot, scheduleLoaded, lastSavedSnapshot]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -417,13 +417,13 @@ export default function SchedulePage() {
         } else {
           // No saved schedule — set baseline snapshot to current defaults
           // so "Unsaved changes" only appears after the user actually changes something
-          lastSavedSnapshotRef.current = JSON.stringify({
+          setLastSavedSnapshot(JSON.stringify({
             title: "",
             startDate,
             endDate,
             selectedRuleIds: [],
             calendarExercises: {},
-          });
+          }));
           setScheduleLoaded(true);
         }
       } catch (err) {
@@ -459,7 +459,7 @@ export default function SchedulePage() {
         setScheduleId(saved.id);
       }
       await loadSchedulesForDropdown();
-      lastSavedSnapshotRef.current = getCurrentSnapshot();
+      setLastSavedSnapshot(getCurrentSnapshot());
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2500);
     } catch (err: any) {
