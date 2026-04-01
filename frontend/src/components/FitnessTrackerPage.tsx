@@ -174,12 +174,39 @@ export default function FitnessTrackerPage() {
                 (need 2+)
               </div>
               
-              <input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search schedules..."
-                className="w-[280px] rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-white/40 outline-none backdrop-blur-xl focus:border-white/30 focus:ring-2 focus:ring-white/10"
-              />
+              <div className="flex items-center gap-3">
+                <div className="text-sm text-white/50">
+                  Showing{" "}
+                  <span className="text-white/80 font-medium">
+                    {visibleSchedules.length}
+                  </span>{" "}
+                  of{" "}
+                  <span className="text-white/80 font-medium">
+                    {schedules.length}
+                  </span>
+                </div>
+
+                <div className="relative">
+                  <input
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search schedules..."
+                    className="w-[280px] rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 pr-11 text-sm text-white placeholder-white/40 outline-none backdrop-blur-xl focus:border-white/30 focus:ring-2 focus:ring-white/10"
+                  />
+
+                  {searchQuery.trim() ? (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery("")}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg border border-white/15 bg-white/5 px-2 py-1 text-xs text-white/70 hover:bg-white/10 hover:text-white"
+                      aria-label="Clear search"
+                      title="Clear"
+                    >
+                      ×
+                    </button>
+                  ) : null}
+                </div>
+              </div>
             </div>
            
             <div className="flex flex-wrap gap-6">
