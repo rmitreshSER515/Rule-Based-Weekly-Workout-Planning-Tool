@@ -7,7 +7,6 @@ import {
   type ExerciseIntensitySummary,
 } from "../api/metrics";
 
-
 type IntensityLevel = "recovery" | "easy" | "medium" | "hard" | "allOut";
 
 const INTENSITY_LEVELS: IntensityLevel[] = [
@@ -54,11 +53,11 @@ const normalizeIntensity = (value: string): IntensityLevel => {
     n === "all out" ||
     n === "all-out effort" ||
     n === "all out effort"
-  )
+  ) {
     return "allOut";
-  return "easy"; 
+  }
+  return "easy";
 };
-
 
 const parseDateLocal = (s: string): Date => {
   const [y, m, d] = s.split("-").map(Number);
@@ -74,16 +73,21 @@ const dateKeyFromDate = (d: Date): string => {
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+interface ExerciseSummary {
+  name: string;
+  count: number;
+}
 
 interface ScheduleStats {
   exerciseCounts: Record<IntensityLevel, number>;
   totalExercises: number;
   totalMinutes: number;
   perDayMinutes: { label: string; minutes: number }[];
-  averageIntensity: number; 
+  averageIntensity: number;
   averageIntensityLabel: string;
   restDays: number;
-  intensityDays: number; 
+  intensityDays: number;
+  exercises: ExerciseSummary[];
 }
 
 function computeStats(schedule: ScheduleDto): ScheduleStats {
@@ -100,6 +104,7 @@ function computeStats(schedule: ScheduleDto): ScheduleStats {
   let intensitySum = 0;
   let exerciseCount = 0;
 
+  const exerciseMap = new Map<string, number>();
 
   const start = parseDateLocal(schedule.startDate);
   const end = parseDateLocal(schedule.endDate);
@@ -113,24 +118,33 @@ function computeStats(schedule: ScheduleDto): ScheduleStats {
 
   for (const [dateKey, items] of Object.entries(cal)) {
     let dayTotal = 0;
+
     for (const item of items) {
       const level = normalizeIntensity(String(item.intensity));
       counts[level]++;
       exerciseCount++;
       intensitySum += intensityScale[level];
 
+      const exerciseName =
+        typeof item.name === "string" && item.name.trim()
+          ? item.name.trim()
+          : "Unnamed Exercise";
+
+      exerciseMap.set(exerciseName, (exerciseMap.get(exerciseName) || 0) + 1);
+
       const hrs = parseInt(item.duration?.hours || "0", 10) || 0;
       const mins = parseInt(item.duration?.minutes || "0", 10) || 0;
       const itemMins = hrs * 60 + mins;
+
       totalMinutes += itemMins;
       dayTotal += itemMins;
     }
+
     if (perDayMap.has(dateKey)) {
       perDayMap.set(dateKey, dayTotal);
     }
   }
 
-  
   const perDayMinutes: { label: string; minutes: number }[] = [];
   for (const [key, mins] of perDayMap) {
     const d = parseDateLocal(key);
@@ -140,37 +154,41 @@ function computeStats(schedule: ScheduleDto): ScheduleStats {
     });
   }
 
-  
   const avgNum = exerciseCount > 0 ? intensitySum / exerciseCount : 0;
   let avgLabel = "—";
+
   if (exerciseCount > 0) {
     const rounded = Math.round(avgNum);
-    const found = INTENSITY_LEVELS.find(
-      (l) => intensityScale[l] === rounded
-    );
+    const found = INTENSITY_LEVELS.find((l) => intensityScale[l] === rounded);
     avgLabel = found ? intensityLabel[found] : "—";
   }
 
- 
   let restDays = 0;
-  let intensityDays = 0; 
-  
+  let intensityDays = 0;
+
   for (const [dateKey] of perDayMap) {
     const items = cal[dateKey] ?? [];
+
     if (items.length === 0) {
       restDays++;
     } else {
-      
       const hasHighIntensity = items.some((item) => {
         const level = normalizeIntensity(String(item.intensity));
         return level === "hard" || level === "allOut";
       });
-      
+
       if (hasHighIntensity) {
         intensityDays++;
       }
     }
   }
+
+  const exercises: ExerciseSummary[] = Array.from(exerciseMap.entries())
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => {
+      if (b.count !== a.count) return b.count - a.count;
+      return a.name.localeCompare(b.name);
+    });
 
   return {
     exerciseCounts: counts,
@@ -180,7 +198,8 @@ function computeStats(schedule: ScheduleDto): ScheduleStats {
     averageIntensity: avgNum,
     averageIntensityLabel: avgLabel,
     restDays,
-    intensityDays, 
+    intensityDays,
+    exercises,
   };
 }
 
@@ -192,37 +211,40 @@ const formatTime = (minutes: number): string => {
   return `${h}h ${m}m`;
 };
 
-
 export default function CompareSchedulesPage() {
   const location = useLocation();
   const navigate = useNavigate();
+
   const passedIds: string[] =
-    (location.state as { selectedScheduleIds?: string[] })
-      ?.selectedScheduleIds ?? [];
+    (location.state as { selectedScheduleIds?: string[] })?.selectedScheduleIds ??
+    [];
 
   const [allSchedules, setAllSchedules] = useState<ScheduleDto[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>(passedIds);
   const [loading, setLoading] = useState(true);
-  const [metricsByScheduleId, setMetricsByScheduleId] =
-  useState<Record<string, ScheduleMetrics>>({});
+  const [metricsByScheduleId, setMetricsByScheduleId] = useState<
+    Record<string, ScheduleMetrics>
+  >({});
   const [openIntensityKeys, setOpenIntensityKeys] = useState<Set<string>>(
     () => new Set()
   );
 
-  
   const [exercisesExpanded, setExercisesExpanded] = useState(true);
   const [timeExpanded, setTimeExpanded] = useState(false);
+  const [allExercisesExpanded, setAllExercisesExpanded] = useState(false);
 
- 
   useEffect(() => {
     let cancelled = false;
+
     const load = async () => {
       try {
         const stored = localStorage.getItem("user");
         if (!stored) return;
+
         const user = JSON.parse(stored);
         const userId = user?.id ?? user?._id;
         if (!userId) return;
+
         const items = await fetchSchedules(userId);
         if (!cancelled) setAllSchedules(items);
       } catch (err) {
@@ -231,7 +253,9 @@ export default function CompareSchedulesPage() {
         if (!cancelled) setLoading(false);
       }
     };
+
     load();
+
     return () => {
       cancelled = true;
     };
@@ -248,7 +272,6 @@ export default function CompareSchedulesPage() {
     [allSchedules, selectedIds]
   );
 
-  
   useEffect(() => {
     let cancelled = false;
 
@@ -278,6 +301,7 @@ export default function CompareSchedulesPage() {
           next[entry[0]] = entry[1];
         }
       }
+
       setMetricsByScheduleId(next);
     };
 
@@ -297,13 +321,14 @@ export default function CompareSchedulesPage() {
   }, [selectedSchedules]);
 
   const intensityBreakdownBySchedule = useMemo(() => {
-  const map = new Map<
-    string,
-    Record<IntensityLevel, ExerciseIntensitySummary[]>
-  >();
+    const map = new Map<
+      string,
+      Record<IntensityLevel, ExerciseIntensitySummary[]>
+    >();
 
     for (const schedule of selectedSchedules) {
       const metrics = metricsByScheduleId[schedule.id];
+
       const buckets: Record<IntensityLevel, ExerciseIntensitySummary[]> = {
         recovery: [],
         easy: [],
@@ -346,7 +371,6 @@ export default function CompareSchedulesPage() {
     });
   };
 
-  /* ── Row rendering helpers ── */
   const renderLabelRow = (
     label: string,
     getValue: (stats: ScheduleStats) => string | number,
@@ -360,12 +384,14 @@ export default function CompareSchedulesPage() {
       >
         {label}
       </div>
+
       {selectedSchedules.map((s) => {
         const stats = statsMap.get(s.id);
+
         return (
           <div
             key={s.id}
-            className={`flex items-center justify-center px-4 py-3 border-b border-white/5 ${
+            className={`flex items-center justify-center px-4 py-3 border-b border-white/5 border-l border-l-white/5 ${
               bold ? "font-semibold text-white" : "text-white/80"
             }`}
           >
@@ -376,12 +402,10 @@ export default function CompareSchedulesPage() {
     </div>
   );
 
-
   const gridCols = `minmax(220px, 260px) repeat(${selectedSchedules.length}, minmax(140px, 1fr))`;
 
   return (
     <div className="min-h-screen w-full relative overflow-hidden bg-slate-950">
-      {/* Background effects — same as FitnessTrackerPage */}
       <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-950" />
       <div className="absolute -top-32 -left-32 h-[520px] w-[520px] rounded-full bg-fuchsia-500/20 blur-[90px]" />
       <div className="absolute -bottom-40 -right-40 h-[620px] w-[620px] rounded-full bg-cyan-400/15 blur-[110px]" />
@@ -396,7 +420,6 @@ export default function CompareSchedulesPage() {
 
       <div className="relative z-10 min-h-screen px-6 py-8">
         <div className="mx-auto max-w-7xl">
-          {/* Header */}
           <div className="mb-8 border-b border-white/15 pb-6">
             <div className="flex items-center justify-between">
               <div>
@@ -407,6 +430,7 @@ export default function CompareSchedulesPage() {
                   Side-by-side statistics for your selected schedules
                 </p>
               </div>
+
               <button
                 type="button"
                 onClick={() => navigate("/fitness")}
@@ -417,23 +441,21 @@ export default function CompareSchedulesPage() {
             </div>
           </div>
 
-          {/* Main layout */}
           <div className="flex gap-6">
-            {/* Left sidebar — schedule selection */}
             <div className="w-[240px] shrink-0 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-4 self-start">
               <h2 className="text-sm font-semibold text-white/50 uppercase tracking-wider mb-4">
                 Schedules
               </h2>
+
               {loading ? (
-                <p className="text-sm text-white/40 animate-pulse">
-                  Loading…
-                </p>
+                <p className="text-sm text-white/40 animate-pulse">Loading…</p>
               ) : allSchedules.length === 0 ? (
                 <p className="text-sm text-white/40">No schedules found.</p>
               ) : (
                 <ul className="space-y-1.5">
                   {allSchedules.map((s) => {
                     const checked = selectedIds.includes(s.id);
+
                     return (
                       <li key={s.id}>
                         <button
@@ -445,7 +467,6 @@ export default function CompareSchedulesPage() {
                               : "text-white/70 hover:bg-white/5 border border-transparent"
                           }`}
                         >
-                          {/* Checkbox */}
                           <span
                             className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors ${
                               checked
@@ -468,6 +489,7 @@ export default function CompareSchedulesPage() {
                               </svg>
                             )}
                           </span>
+
                           <span className="truncate">
                             {s.title || "Untitled Schedule"}
                           </span>
@@ -479,7 +501,6 @@ export default function CompareSchedulesPage() {
               )}
             </div>
 
-            {/* Right — comparison table */}
             <div className="flex-1 min-w-0 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl overflow-hidden">
               {selectedSchedules.length === 0 ? (
                 <div className="flex items-center justify-center h-64 text-white/40 text-lg">
@@ -487,12 +508,12 @@ export default function CompareSchedulesPage() {
                 </div>
               ) : (
                 <div className="overflow-x-auto compare-table-scroll">
-                  {/* Column headers */}
                   <div
                     className="grid border-b border-white/10"
                     style={{ gridTemplateColumns: gridCols }}
                   >
                     <div className="px-4 py-4" />
+
                     {selectedSchedules.map((s) => (
                       <div
                         key={s.id}
@@ -508,18 +529,14 @@ export default function CompareSchedulesPage() {
                     ))}
                   </div>
 
-                  {/* Data rows */}
                   <div
                     className="grid"
                     style={{ gridTemplateColumns: gridCols }}
                   >
-                    {/* ─── Number of Exercises (collapsible) ─── */}
                     <div className="contents">
                       <button
                         type="button"
-                        onClick={() =>
-                          setExercisesExpanded((v) => !v)
-                        }
+                        onClick={() => setExercisesExpanded((v) => !v)}
                         className="flex items-center gap-2 px-4 py-3 font-semibold text-white border-b border-white/5 hover:bg-white/5 transition-colors text-left"
                       >
                         Number of Exercises
@@ -539,8 +556,10 @@ export default function CompareSchedulesPage() {
                           <path d="m18 15-6-6-6 6" />
                         </svg>
                       </button>
+
                       {selectedSchedules.map((s) => {
                         const stats = statsMap.get(s.id);
+
                         return (
                           <div
                             key={s.id}
@@ -552,7 +571,6 @@ export default function CompareSchedulesPage() {
                       })}
                     </div>
 
-                    {/* Intensity sub-rows */}
                     {exercisesExpanded &&
                       INTENSITY_LEVELS.map((level) => (
                         <div className="contents" key={level}>
@@ -564,12 +582,14 @@ export default function CompareSchedulesPage() {
                             </span>
                             {intensityLabel[level]} Exercises
                           </div>
+
                           {selectedSchedules.map((s) => {
                             const stats = statsMap.get(s.id);
                             const breakdown =
                               intensityBreakdownBySchedule.get(s.id)?.[level] ?? [];
                             const dropdownKey = `${s.id}:${level}`;
                             const isOpen = openIntensityKeys.has(dropdownKey);
+
                             return (
                               <div
                                 key={s.id}
@@ -578,13 +598,17 @@ export default function CompareSchedulesPage() {
                                 <span className="text-sm font-semibold">
                                   {stats?.exerciseCounts[level] ?? 0}
                                 </span>
+
                                 <button
                                   type="button"
-                                  onClick={() => toggleIntensityDropdown(dropdownKey)}
+                                  onClick={() =>
+                                    toggleIntensityDropdown(dropdownKey)
+                                  }
                                   className="rounded-lg border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/80 hover:bg-white/10 transition-colors"
                                 >
                                   {isOpen ? "Hide exercises" : "Show exercises"}
                                 </button>
+
                                 {isOpen && (
                                   <div className="w-full rounded-lg border border-white/10 bg-white/5 px-2.5 py-2 text-[11px] text-white/80">
                                     {breakdown.length === 0 ? (
@@ -616,7 +640,87 @@ export default function CompareSchedulesPage() {
                         </div>
                       ))}
 
-                    {/* ─── Total Weekly Time (collapsible) ─── */}
+                    <div className="contents">
+                      <button
+                        type="button"
+                        onClick={() => setAllExercisesExpanded((v) => !v)}
+                        className="flex items-center gap-2 px-4 py-3 font-semibold text-white border-b border-white/5 hover:bg-white/5 transition-colors text-left"
+                      >
+                        Exercises
+                        <svg
+                          width="12"
+                          height="12"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className={`transition-transform ${
+                            allExercisesExpanded ? "" : "rotate-180"
+                          }`}
+                        >
+                          <path d="m18 15-6-6-6 6" />
+                        </svg>
+                      </button>
+
+                      {selectedSchedules.map((s) => {
+                        const stats = statsMap.get(s.id);
+                        const exercises = stats?.exercises ?? [];
+
+                        return (
+                          <div
+                            key={s.id}
+                            className="flex items-center justify-center px-4 py-3 font-semibold text-white border-b border-white/5 border-l border-l-white/5"
+                          >
+                            {exercises.length}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {allExercisesExpanded && (
+                      <div className="contents">
+                        <div className="pl-8 pr-4 py-2.5 text-sm text-white/70 border-b border-white/5">
+                          Exercise Name
+                        </div>
+
+                        {selectedSchedules.map((s) => {
+                          const stats = statsMap.get(s.id);
+                          const exercises = stats?.exercises ?? [];
+
+                          return (
+                            <div
+                              key={s.id}
+                              className="px-4 py-2.5 border-b border-white/5 border-l border-l-white/5 align-top"
+                            >
+                              {exercises.length === 0 ? (
+                                <div className="text-xs text-white/50 text-center py-2">
+                                  No exercises
+                                </div>
+                              ) : (
+                                <ul className="space-y-2">
+                                  {exercises.map((ex) => (
+                                    <li
+                                      key={ex.name}
+                                      className="flex items-center justify-between gap-2 text-xs px-3 py-2 rounded-lg bg-white/5 border border-white/10"
+                                    >
+                                      <span className="truncate font-medium max-w-[140px] text-white/90">
+                                        {ex.name}
+                                      </span>
+                                      <span className="text-white/60 shrink-0">
+                                        ×{ex.count}
+                                      </span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
                     <div className="contents">
                       <button
                         type="button"
@@ -640,8 +744,10 @@ export default function CompareSchedulesPage() {
                           <path d="m18 15-6-6-6 6" />
                         </svg>
                       </button>
+
                       {selectedSchedules.map((s) => {
                         const stats = statsMap.get(s.id);
+
                         return (
                           <div
                             key={s.id}
@@ -653,55 +759,42 @@ export default function CompareSchedulesPage() {
                       })}
                     </div>
 
-                    {/* Per-day sub-rows */}
                     {timeExpanded &&
                       (() => {
-                        
-                        const firstStats = statsMap.get(
-                          selectedSchedules[0]?.id
-                        );
+                        const firstStats = statsMap.get(selectedSchedules[0]?.id);
                         if (!firstStats) return null;
-                        return firstStats.perDayMinutes.map(
-                          (day, idx) => (
-                            <div className="contents" key={day.label}>
-                              <div className="pl-8 pr-4 py-2.5 text-sm text-white/70 border-b border-white/5">
-                                {day.label}
-                              </div>
-                              {selectedSchedules.map((s) => {
-                                const stats = statsMap.get(s.id);
-                                const dayData =
-                                  stats?.perDayMinutes[idx];
-                                return (
-                                  <div
-                                    key={s.id}
-                                    className="flex items-center justify-center px-4 py-2.5 text-sm text-white/80 border-b border-white/5 border-l border-l-white/5"
-                                  >
-                                    {dayData
-                                      ? formatTime(dayData.minutes)
-                                      : "—"}
-                                  </div>
-                                );
-                              })}
+
+                        return firstStats.perDayMinutes.map((day, idx) => (
+                          <div className="contents" key={day.label}>
+                            <div className="pl-8 pr-4 py-2.5 text-sm text-white/70 border-b border-white/5">
+                              {day.label}
                             </div>
-                          )
-                        );
+
+                            {selectedSchedules.map((s) => {
+                              const stats = statsMap.get(s.id);
+                              const dayData = stats?.perDayMinutes[idx];
+
+                              return (
+                                <div
+                                  key={s.id}
+                                  className="flex items-center justify-center px-4 py-2.5 text-sm text-white/80 border-b border-white/5 border-l border-l-white/5"
+                                >
+                                  {dayData ? formatTime(dayData.minutes) : "—"}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ));
                       })()}
 
-                    {/* ─── Average Intensity ─── */}
                     {renderLabelRow(
                       "Average Intensity",
                       (s) => s.averageIntensityLabel,
                       true
                     )}
 
-                    {/* ─── Rest Days ─── */}
-                    {renderLabelRow(
-                      "Rest Days",
-                      (s) => s.restDays,
-                      true
-                    )}
+                    {renderLabelRow("Rest Days", (s) => s.restDays, true)}
 
-                    {/* ─── Intensity Days ─── ADDED */}
                     {renderLabelRow(
                       "Intensity Days",
                       (s) => s.intensityDays,
