@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
 import { MongooseModule } from '@nestjs/mongoose';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { join } from 'path';
 
 import { AppController } from './app.controller';
@@ -21,6 +23,16 @@ import { AuthModule } from './auth/auth.module';
       envFilePath: join(__dirname, '..', '.env'),
     }),
 
+    ThrottlerModule.forRoot({
+      throttlers: [
+        {
+          name: 'default',
+          ttl: 60_000,
+          limit: 120,
+        },
+      ],
+    }),
+
     MongooseModule.forRoot(
       process.env.MONGODB_URI ?? 'mongodb://127.0.0.1:27017/workout_planner',
       { serverSelectionTimeoutMS: 5000 },
@@ -37,6 +49,9 @@ import { AuthModule } from './auth/auth.module';
   ],
   // controllers: [AppController, HealthController],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+  ],
 })
 export class AppModule {}
