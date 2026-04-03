@@ -1,11 +1,6 @@
-import { useState, useEffect, useMemo } from "react";
+import { Fragment, useState, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { fetchSchedules, type ScheduleDto } from "../api/schedules";
-import {
-  fetchScheduleMetrics,
-  type ScheduleMetrics,
-  type ExerciseIntensitySummary,
-} from "../api/metrics";
 
 type IntensityLevel = "recovery" | "easy" | "medium" | "hard" | "allOut";
 
@@ -76,6 +71,19 @@ const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 interface ExerciseSummary {
   name: string;
   count: number;
+}
+
+interface ExerciseScheduleSummary {
+  totalCount: number;
+  totalMinutes: number;
+  countsByIntensity: Record<IntensityLevel, number>;
+  minutesByIntensity: Record<IntensityLevel, number>;
+}
+
+interface CommonExerciseSummary {
+  key: string;
+  name: string;
+  scheduleDataById: Record<string, ExerciseScheduleSummary>;
 }
 
 interface ScheduleStats {
@@ -211,6 +219,30 @@ const formatTime = (minutes: number): string => {
   return `${h}h ${m}m`;
 };
 
+const formatCountDisplay = (count: number): string =>
+  count === 0 ? "—" : String(count);
+
+const formatTimeDisplay = (minutes: number): string =>
+  minutes === 0 ? "—" : formatTime(minutes);
+
+const normalizeExerciseName = (value: string): string =>
+  value.trim().toLowerCase();
+
+const createEmptyIntensityMap = (): Record<IntensityLevel, number> => ({
+  recovery: 0,
+  easy: 0,
+  medium: 0,
+  hard: 0,
+  allOut: 0,
+});
+
+const createExerciseScheduleSummary = (): ExerciseScheduleSummary => ({
+  totalCount: 0,
+  totalMinutes: 0,
+  countsByIntensity: createEmptyIntensityMap(),
+  minutesByIntensity: createEmptyIntensityMap(),
+});
+
 export default function CompareSchedulesPage() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -222,14 +254,10 @@ export default function CompareSchedulesPage() {
   const [allSchedules, setAllSchedules] = useState<ScheduleDto[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>(passedIds);
   const [loading, setLoading] = useState(true);
-  const [metricsByScheduleId, setMetricsByScheduleId] = useState<
-    Record<string, ScheduleMetrics>
-  >({});
-  const [openIntensityKeys, setOpenIntensityKeys] = useState<Set<string>>(
+  const [openExerciseKeys, setOpenExerciseKeys] = useState<Set<string>>(
     () => new Set()
   );
 
-  const [exercisesExpanded, setExercisesExpanded] = useState(true);
   const [timeExpanded, setTimeExpanded] = useState(false);
   const [allExercisesExpanded, setAllExercisesExpanded] = useState(false);
 
@@ -272,46 +300,6 @@ export default function CompareSchedulesPage() {
     [allSchedules, selectedIds]
   );
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const load = async () => {
-      if (selectedSchedules.length === 0) {
-        setMetricsByScheduleId({});
-        return;
-      }
-
-      const entries = await Promise.all(
-        selectedSchedules.map(async (schedule) => {
-          try {
-            const data = await fetchScheduleMetrics(schedule.id);
-            return [schedule.id, data.metrics] as const;
-          } catch (err) {
-            console.error("Failed to load metrics for schedule", schedule.id, err);
-            return null;
-          }
-        })
-      );
-
-      if (cancelled) return;
-
-      const next: Record<string, ScheduleMetrics> = {};
-      for (const entry of entries) {
-        if (entry) {
-          next[entry[0]] = entry[1];
-        }
-      }
-
-      setMetricsByScheduleId(next);
-    };
-
-    load();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedSchedules]);
-
   const statsMap = useMemo(() => {
     const map = new Map<string, ScheduleStats>();
     for (const s of selectedSchedules) {
@@ -320,47 +308,92 @@ export default function CompareSchedulesPage() {
     return map;
   }, [selectedSchedules]);
 
-  const intensityBreakdownBySchedule = useMemo(() => {
-    const map = new Map<
-      string,
-      Record<IntensityLevel, ExerciseIntensitySummary[]>
-    >();
+  const commonExercises = useMemo(() => {
+    const aggregate = new Map<string, CommonExerciseSummary>();
 
     for (const schedule of selectedSchedules) {
-      const metrics = metricsByScheduleId[schedule.id];
+      const perScheduleTotals = new Map<
+        string,
+        ExerciseScheduleSummary & { name: string }
+      >();
 
-      const buckets: Record<IntensityLevel, ExerciseIntensitySummary[]> = {
-        recovery: [],
-        easy: [],
-        medium: [],
-        hard: [],
-        allOut: [],
-      };
+      for (const items of Object.values(schedule.calendarExercises ?? {})) {
+        for (const item of items) {
+          const exerciseName =
+            typeof item.name === "string" && item.name.trim()
+              ? item.name.trim()
+              : "Unnamed Exercise";
+          const exerciseKey = normalizeExerciseName(exerciseName);
+          const hrs = parseInt(item.duration?.hours || "0", 10) || 0;
+          const mins = parseInt(item.duration?.minutes || "0", 10) || 0;
+          const totalMinutes = hrs * 60 + mins;
+          const level = normalizeIntensity(String(item.intensity));
+          let current = perScheduleTotals.get(exerciseKey);
 
-      if (metrics?.exerciseIntensityBreakdown) {
-        for (const entry of metrics.exerciseIntensityBreakdown) {
-          const level = entry.intensity as IntensityLevel;
-          if (buckets[level]) {
-            buckets[level].push(entry);
+          if (!current) {
+            current = {
+              name: exerciseName,
+              ...createExerciseScheduleSummary(),
+            };
+            perScheduleTotals.set(exerciseKey, current);
           }
+
+          current.totalCount += 1;
+          current.totalMinutes += totalMinutes;
+          current.countsByIntensity[level] += 1;
+          current.minutesByIntensity[level] += totalMinutes;
         }
       }
 
-      for (const level of INTENSITY_LEVELS) {
-        buckets[level].sort((a, b) => {
-          if (b.count !== a.count) return b.count - a.count;
-          return a.name.localeCompare(b.name);
-        });
-      }
+      for (const [exerciseKey, exercise] of perScheduleTotals) {
+        const existing = aggregate.get(exerciseKey);
 
-      map.set(schedule.id, buckets);
+        if (existing) {
+          existing.scheduleDataById[schedule.id] = {
+            totalCount: exercise.totalCount,
+            totalMinutes: exercise.totalMinutes,
+            countsByIntensity: { ...exercise.countsByIntensity },
+            minutesByIntensity: { ...exercise.minutesByIntensity },
+          };
+        } else {
+          aggregate.set(exerciseKey, {
+            key: exerciseKey,
+            name: exercise.name,
+            scheduleDataById: {
+              [schedule.id]: {
+                totalCount: exercise.totalCount,
+                totalMinutes: exercise.totalMinutes,
+                countsByIntensity: { ...exercise.countsByIntensity },
+                minutesByIntensity: { ...exercise.minutesByIntensity },
+              },
+            },
+          });
+        }
+      }
     }
 
-    return map;
-  }, [metricsByScheduleId, selectedSchedules]);
+    return Array.from(aggregate.values()).sort((a, b) => {
+        const sharedSchedulesA = Object.keys(a.scheduleDataById).length;
+        const sharedSchedulesB = Object.keys(b.scheduleDataById).length;
+        const totalA = Object.values(a.scheduleDataById).reduce(
+          (sum, details) => sum + details.totalMinutes,
+          0
+        );
+        const totalB = Object.values(b.scheduleDataById).reduce(
+          (sum, details) => sum + details.totalMinutes,
+          0
+        );
 
-  const toggleIntensityDropdown = (key: string) => {
-    setOpenIntensityKeys((prev) => {
+        if (sharedSchedulesB !== sharedSchedulesA) {
+          return sharedSchedulesB - sharedSchedulesA;
+        }
+        if (totalB !== totalA) return totalB - totalA;
+        return a.name.localeCompare(b.name);
+      });
+  }, [selectedSchedules]);
+
+  const toggleExerciseDropdown = (key: string) => {
+    setOpenExerciseKeys((prev) => {
       const next = new Set(prev);
       if (next.has(key)) {
         next.delete(key);
@@ -536,113 +569,6 @@ export default function CompareSchedulesPage() {
                     <div className="contents">
                       <button
                         type="button"
-                        onClick={() => setExercisesExpanded((v) => !v)}
-                        className="flex items-center gap-2 px-4 py-3 font-semibold text-white border-b border-white/5 hover:bg-white/5 transition-colors text-left"
-                      >
-                        Number of Exercises
-                        <svg
-                          width="12"
-                          height="12"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          className={`transition-transform ${
-                            exercisesExpanded ? "" : "rotate-180"
-                          }`}
-                        >
-                          <path d="m18 15-6-6-6 6" />
-                        </svg>
-                      </button>
-
-                      {selectedSchedules.map((s) => {
-                        const stats = statsMap.get(s.id);
-
-                        return (
-                          <div
-                            key={s.id}
-                            className="flex items-center justify-center px-4 py-3 font-semibold text-white border-b border-white/5 border-l border-l-white/5"
-                          >
-                            {stats?.totalExercises ?? 0}
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {exercisesExpanded &&
-                      INTENSITY_LEVELS.map((level) => (
-                        <div className="contents" key={level}>
-                          <div className="flex items-center gap-2 pl-8 pr-4 py-2.5 text-sm text-white/70 border-b border-white/5">
-                            <span
-                              className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold leading-none ${intensityPill[level]}`}
-                            >
-                              {intensityScale[level]}
-                            </span>
-                            {intensityLabel[level]} Exercises
-                          </div>
-
-                          {selectedSchedules.map((s) => {
-                            const stats = statsMap.get(s.id);
-                            const breakdown =
-                              intensityBreakdownBySchedule.get(s.id)?.[level] ?? [];
-                            const dropdownKey = `${s.id}:${level}`;
-                            const isOpen = openIntensityKeys.has(dropdownKey);
-
-                            return (
-                              <div
-                                key={s.id}
-                                className="flex flex-col items-center justify-center gap-2 px-4 py-2.5 text-sm text-white/80 border-b border-white/5 border-l border-l-white/5"
-                              >
-                                <span className="text-sm font-semibold">
-                                  {stats?.exerciseCounts[level] ?? 0}
-                                </span>
-
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    toggleIntensityDropdown(dropdownKey)
-                                  }
-                                  className="rounded-lg border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/80 hover:bg-white/10 transition-colors"
-                                >
-                                  {isOpen ? "Hide exercises" : "Show exercises"}
-                                </button>
-
-                                {isOpen && (
-                                  <div className="w-full rounded-lg border border-white/10 bg-white/5 px-2.5 py-2 text-[11px] text-white/80">
-                                    {breakdown.length === 0 ? (
-                                      <div className="text-white/50 text-xs">
-                                        No exercises in this intensity
-                                      </div>
-                                    ) : (
-                                      <ul className="space-y-1">
-                                        {breakdown.map((item) => (
-                                          <li
-                                            key={`${item.name}-${item.intensity}`}
-                                            className="flex items-center justify-between gap-2"
-                                          >
-                                            <span className="truncate">
-                                              {item.name}
-                                            </span>
-                                            <span className="text-white/60">
-                                              {item.count}
-                                            </span>
-                                          </li>
-                                        ))}
-                                      </ul>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ))}
-
-                    <div className="contents">
-                      <button
-                        type="button"
                         onClick={() => setAllExercisesExpanded((v) => !v)}
                         className="flex items-center gap-2 px-4 py-3 font-semibold text-white border-b border-white/5 hover:bg-white/5 transition-colors text-left"
                       >
@@ -666,59 +592,192 @@ export default function CompareSchedulesPage() {
 
                       {selectedSchedules.map((s) => {
                         const stats = statsMap.get(s.id);
-                        const exercises = stats?.exercises ?? [];
 
                         return (
                           <div
                             key={s.id}
-                            className="flex items-center justify-center px-4 py-3 font-semibold text-white border-b border-white/5 border-l border-l-white/5"
+                            className="px-4 py-3 font-semibold text-white border-b border-white/5 border-l border-l-white/5"
                           >
-                            {exercises.length}
+                            {stats ? (
+                              <div className="grid grid-cols-2 gap-3 text-center">
+                                <div className="min-w-0">
+                                  <span className="block text-[10px] font-semibold uppercase tracking-[0.18em] text-white/40">
+                                    Count
+                                  </span>
+                                  <span className="block text-white">
+                                    {formatCountDisplay(stats.totalExercises)}
+                                  </span>
+                                </div>
+                                <div className="min-w-0">
+                                  <span className="block text-[10px] font-semibold uppercase tracking-[0.18em] text-white/40">
+                                    Time
+                                  </span>
+                                  <span className="block text-white">
+                                    {formatTimeDisplay(stats.totalMinutes)}
+                                  </span>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex h-full items-center justify-center text-white/40">
+                                —
+                              </div>
+                            )}
                           </div>
                         );
                       })}
                     </div>
 
                     {allExercisesExpanded && (
-                      <div className="contents">
-                        <div className="pl-8 pr-4 py-2.5 text-sm text-white/70 border-b border-white/5">
-                          Exercise Name
-                        </div>
+                      (commonExercises.length === 0 ? (
+                        <div className="contents">
+                          <div className="pl-8 pr-4 py-2.5 text-sm text-white/50 border-b border-white/5">
+                            No exercises found in the selected schedules.
+                          </div>
 
-                        {selectedSchedules.map((s) => {
-                          const stats = statsMap.get(s.id);
-                          const exercises = stats?.exercises ?? [];
-
-                          return (
+                          {selectedSchedules.map((s) => (
                             <div
                               key={s.id}
-                              className="px-4 py-2.5 border-b border-white/5 border-l border-l-white/5 align-top"
+                              className="flex items-center justify-center px-4 py-2.5 text-sm text-white/40 border-b border-white/5 border-l border-l-white/5"
                             >
-                              {exercises.length === 0 ? (
-                                <div className="text-xs text-white/50 text-center py-2">
-                                  No exercises
-                                </div>
-                              ) : (
-                                <ul className="space-y-2">
-                                  {exercises.map((ex) => (
-                                    <li
-                                      key={ex.name}
-                                      className="flex items-center justify-between gap-2 text-xs px-3 py-2 rounded-lg bg-white/5 border border-white/10"
-                                    >
-                                      <span className="truncate font-medium max-w-[140px] text-white/90">
-                                        {ex.name}
-                                      </span>
-                                      <span className="text-white/60 shrink-0">
-                                        ×{ex.count}
-                                      </span>
-                                    </li>
-                                  ))}
-                                </ul>
-                              )}
+                              —
                             </div>
+                          ))}
+                        </div>
+                      ) : (
+                        commonExercises.map((exercise) => {
+                          const isOpen = openExerciseKeys.has(exercise.key);
+                          const visibleIntensityLevels = INTENSITY_LEVELS.filter(
+                            (level) =>
+                              selectedSchedules.some(
+                                (schedule) =>
+                                  (exercise.scheduleDataById[schedule.id]
+                                    ?.countsByIntensity[level] ?? 0) > 0
+                              )
                           );
-                        })}
-                      </div>
+
+                          return (
+                            <Fragment key={exercise.key}>
+                              <div className="contents" key={exercise.key}>
+                                <button
+                                  type="button"
+                                  onClick={() => toggleExerciseDropdown(exercise.key)}
+                                  className="flex items-center gap-2 pl-8 pr-4 py-2.5 text-sm text-white/80 border-b border-white/5 hover:bg-white/5 transition-colors text-left"
+                                >
+                                  <svg
+                                    width="12"
+                                    height="12"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2.5"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className={`transition-transform ${
+                                      isOpen ? "" : "rotate-180"
+                                    }`}
+                                  >
+                                    <path d="m18 15-6-6-6 6" />
+                                  </svg>
+                                  <span className="truncate">{exercise.name}</span>
+                                </button>
+
+                                {selectedSchedules.map((s) => {
+                                  const details = exercise.scheduleDataById[s.id];
+
+                                  return (
+                                    <div
+                                      key={s.id}
+                                      className="px-4 py-2.5 text-sm border-b border-white/5 border-l border-l-white/5"
+                                    >
+                                      {details ? (
+                                        <div className="grid grid-cols-2 gap-3 text-center">
+                                          <div className="min-w-0">
+                                            <span className="block text-[10px] font-semibold uppercase tracking-[0.18em] text-white/40">
+                                              Count
+                                            </span>
+                                            <span className="block font-medium text-white/90">
+                                              {formatCountDisplay(details.totalCount)}
+                                            </span>
+                                          </div>
+                                          <div className="min-w-0">
+                                            <span className="block text-[10px] font-semibold uppercase tracking-[0.18em] text-white/40">
+                                              Time
+                                            </span>
+                                            <span className="block font-medium text-white/90">
+                                              {formatTimeDisplay(details.totalMinutes)}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <div className="flex h-full items-center justify-center text-white/40">
+                                          —
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+
+                              {isOpen && (
+                                <>
+                                  {visibleIntensityLevels.map((level) => (
+                                    <div className="contents" key={`${exercise.key}-intensity-${level}`}>
+                                      <div className="flex items-center gap-2 pl-16 pr-4 py-2 text-xs text-white/65 border-b border-white/5">
+                                        <span
+                                          className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold leading-none ${intensityPill[level]}`}
+                                        >
+                                          {intensityScale[level]}
+                                        </span>
+                                        {intensityLabel[level]}
+                                      </div>
+
+                                      {selectedSchedules.map((s) => {
+                                        const details = exercise.scheduleDataById[s.id];
+
+                                        return (
+                                          <div
+                                            key={s.id}
+                                            className="px-4 py-2 text-sm text-white/80 border-b border-white/5 border-l border-l-white/5"
+                                          >
+                                            {details ? (
+                                              <div className="grid grid-cols-2 gap-3 text-center">
+                                                <div className="min-w-0">
+                                                  <span className="block text-[10px] font-semibold uppercase tracking-[0.18em] text-white/40">
+                                                    Count
+                                                  </span>
+                                                  <span className="block font-medium text-white/90">
+                                                    {formatCountDisplay(
+                                                      details.countsByIntensity[level]
+                                                    )}
+                                                  </span>
+                                                </div>
+                                                <div className="min-w-0">
+                                                  <span className="block text-[10px] font-semibold uppercase tracking-[0.18em] text-white/40">
+                                                    Time
+                                                  </span>
+                                                  <span className="block font-medium text-white/90">
+                                                    {formatTimeDisplay(
+                                                      details.minutesByIntensity[level]
+                                                    )}
+                                                  </span>
+                                                </div>
+                                              </div>
+                                            ) : (
+                                              <div className="flex items-center justify-center text-white/40">
+                                                —
+                                              </div>
+                                            )}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  ))}
+                                </>
+                              )}
+                            </Fragment>
+                          );
+                        })
+                      ))
                     )}
 
                     <div className="contents">
