@@ -3,11 +3,13 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
+import { MailService } from '../mail/mail.service';
 import { UsersService } from '../users/users.service';
 import {
   PASSWORD_RESET_COOLDOWN_MS,
@@ -40,9 +42,12 @@ function timingSafeEqualHex(a: string, b: string): boolean {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly users: UsersService,
     private readonly jwt: JwtService,
+    private readonly mail: MailService,
   ) {}
 
   async register(
@@ -142,13 +147,31 @@ export class AuthService {
       passwordResetRequestedAt: now,
     });
 
-    if (process.env.NODE_ENV !== 'production') {
-      const base =
-        process.env.FRONTEND_URL?.replace(/\/$/, '') ?? 'http://localhost:5173';
-      const link = `${base}/reset-password?email=${encodeURIComponent(normalizedEmail)}&token=${rawToken}`;
-      console.log(
-        `[password-reset] Dev only — reset link for ${normalizedEmail}:\n${link}`,
+    const base =
+      process.env.FRONTEND_URL?.replace(/\/$/, '') ?? 'http://localhost:5173';
+    const link = `${base}/reset-password?email=${encodeURIComponent(normalizedEmail)}&token=${rawToken}`;
+
+    const hasResend = Boolean(process.env.RESEND_API_KEY?.trim());
+    if (hasResend) {
+      try {
+        await this.mail.sendPasswordResetEmail(normalizedEmail, link);
+      } catch (err) {
+        this.logger.error(err);
+        throw new HttpException(
+          'Unable to send reset email. Please try again later.',
+          HttpStatus.BAD_GATEWAY,
+        );
+      }
+    } else if (process.env.NODE_ENV === 'production') {
+      throw new HttpException(
+        'Password reset email is not configured.',
+        HttpStatus.SERVICE_UNAVAILABLE,
       );
+    } else {
+      this.logger.warn(
+        `RESEND_API_KEY not set — logging reset link for ${normalizedEmail}`,
+      );
+      this.logger.log(link);
     }
 
     return { ok: true };
