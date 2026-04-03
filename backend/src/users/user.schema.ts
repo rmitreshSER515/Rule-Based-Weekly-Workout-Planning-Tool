@@ -22,6 +22,17 @@ export class User {
 
   @Prop({ default: 'user' })
   role: string;
+
+  /** SHA-256 hash of the raw reset token (never store the raw token). */
+  @Prop({ type: String, default: null })
+  passwordResetTokenHash: string | null;
+
+  @Prop({ type: Date, default: null })
+  passwordResetExpiresAt: Date | null;
+
+  /** Last time a forgot-password email was issued; used for per-user cooldown (e.g. 30 min). */
+  @Prop({ type: Date, default: null })
+  passwordResetRequestedAt: Date | null;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
