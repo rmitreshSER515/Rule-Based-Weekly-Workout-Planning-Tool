@@ -66,8 +66,6 @@ const dateKeyFromDate = (d: Date): string => {
   return `${y}-${m}-${day}`;
 };
 
-const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
 interface ExerciseSummary {
   name: string;
   count: number;
@@ -90,11 +88,10 @@ interface ScheduleStats {
   exerciseCounts: Record<IntensityLevel, number>;
   totalExercises: number;
   totalMinutes: number;
-  perDayMinutes: { label: string; minutes: number }[];
   averageIntensity: number;
   averageIntensityLabel: string;
   restDays: number;
-  intensityDays: number;
+  exerciseDays: number;
   exercises: ExerciseSummary[];
 }
 
@@ -116,17 +113,15 @@ function computeStats(schedule: ScheduleDto): ScheduleStats {
 
   const start = parseDateLocal(schedule.startDate);
   const end = parseDateLocal(schedule.endDate);
-  const perDayMap = new Map<string, number>();
+  const dateKeys: string[] = [];
 
   const cursor = new Date(start);
   while (cursor <= end) {
-    perDayMap.set(dateKeyFromDate(cursor), 0);
+    dateKeys.push(dateKeyFromDate(cursor));
     cursor.setDate(cursor.getDate() + 1);
   }
 
-  for (const [dateKey, items] of Object.entries(cal)) {
-    let dayTotal = 0;
-
+  for (const items of Object.values(cal)) {
     for (const item of items) {
       const level = normalizeIntensity(String(item.intensity));
       counts[level]++;
@@ -145,21 +140,7 @@ function computeStats(schedule: ScheduleDto): ScheduleStats {
       const itemMins = hrs * 60 + mins;
 
       totalMinutes += itemMins;
-      dayTotal += itemMins;
     }
-
-    if (perDayMap.has(dateKey)) {
-      perDayMap.set(dateKey, dayTotal);
-    }
-  }
-
-  const perDayMinutes: { label: string; minutes: number }[] = [];
-  for (const [key, mins] of perDayMap) {
-    const d = parseDateLocal(key);
-    perDayMinutes.push({
-      label: `${DAY_NAMES[d.getDay()]} ${d.getDate()}`,
-      minutes: mins,
-    });
   }
 
   const avgNum = exerciseCount > 0 ? intensitySum / exerciseCount : 0;
@@ -172,24 +153,20 @@ function computeStats(schedule: ScheduleDto): ScheduleStats {
   }
 
   let restDays = 0;
-  let intensityDays = 0;
 
-  for (const [dateKey] of perDayMap) {
+  for (const dateKey of dateKeys) {
     const items = cal[dateKey] ?? [];
 
-    if (items.length === 0) {
-      restDays++;
-    } else {
-      const hasHighIntensity = items.some((item) => {
-        const level = normalizeIntensity(String(item.intensity));
-        return level === "hard" || level === "allOut";
-      });
+    const isRestDay =
+      items.length === 0 ||
+      items.every((item) => normalizeIntensity(String(item.intensity)) === "recovery");
 
-      if (hasHighIntensity) {
-        intensityDays++;
-      }
+    if (isRestDay) {
+      restDays++;
     }
   }
+
+  const exerciseDays = dateKeys.length - restDays;
 
   const exercises: ExerciseSummary[] = Array.from(exerciseMap.entries())
     .map(([name, count]) => ({ name, count }))
@@ -202,11 +179,10 @@ function computeStats(schedule: ScheduleDto): ScheduleStats {
     exerciseCounts: counts,
     totalExercises: exerciseCount,
     totalMinutes,
-    perDayMinutes,
     averageIntensity: avgNum,
     averageIntensityLabel: avgLabel,
     restDays,
-    intensityDays,
+    exerciseDays,
     exercises,
   };
 }
@@ -258,7 +234,6 @@ export default function CompareSchedulesPage() {
     () => new Set()
   );
 
-  const [timeExpanded, setTimeExpanded] = useState(false);
   const [allExercisesExpanded, setAllExercisesExpanded] = useState(false);
 
   useEffect(() => {
@@ -780,72 +755,6 @@ export default function CompareSchedulesPage() {
                       ))
                     )}
 
-                    <div className="contents">
-                      <button
-                        type="button"
-                        onClick={() => setTimeExpanded((v) => !v)}
-                        className="flex items-center gap-2 px-4 py-3 font-semibold text-white border-b border-white/5 hover:bg-white/5 transition-colors text-left"
-                      >
-                        Total Weekly Time
-                        <svg
-                          width="12"
-                          height="12"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          className={`transition-transform ${
-                            timeExpanded ? "" : "rotate-180"
-                          }`}
-                        >
-                          <path d="m18 15-6-6-6 6" />
-                        </svg>
-                      </button>
-
-                      {selectedSchedules.map((s) => {
-                        const stats = statsMap.get(s.id);
-
-                        return (
-                          <div
-                            key={s.id}
-                            className="flex items-center justify-center px-4 py-3 font-semibold text-white border-b border-white/5 border-l border-l-white/5"
-                          >
-                            {stats ? formatTime(stats.totalMinutes) : "—"}
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {timeExpanded &&
-                      (() => {
-                        const firstStats = statsMap.get(selectedSchedules[0]?.id);
-                        if (!firstStats) return null;
-
-                        return firstStats.perDayMinutes.map((day, idx) => (
-                          <div className="contents" key={day.label}>
-                            <div className="pl-8 pr-4 py-2.5 text-sm text-white/70 border-b border-white/5">
-                              {day.label}
-                            </div>
-
-                            {selectedSchedules.map((s) => {
-                              const stats = statsMap.get(s.id);
-                              const dayData = stats?.perDayMinutes[idx];
-
-                              return (
-                                <div
-                                  key={s.id}
-                                  className="flex items-center justify-center px-4 py-2.5 text-sm text-white/80 border-b border-white/5 border-l border-l-white/5"
-                                >
-                                  {dayData ? formatTime(dayData.minutes) : "—"}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ));
-                      })()}
-
                     {renderLabelRow(
                       "Average Intensity",
                       (s) => s.averageIntensityLabel,
@@ -855,8 +764,8 @@ export default function CompareSchedulesPage() {
                     {renderLabelRow("Rest Days", (s) => s.restDays, true)}
 
                     {renderLabelRow(
-                      "Intensity Days",
-                      (s) => s.intensityDays,
+                      "Exercise Days",
+                      (s) => s.exerciseDays,
                       true
                     )}
                   </div>
