@@ -4,6 +4,12 @@ import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import { User, UserDocument } from './user.schema';
 
+export type PasswordResetFields = {
+  passwordResetTokenHash: string | null;
+  passwordResetExpiresAt: Date | null;
+  passwordResetRequestedAt: Date | null;
+};
+
 type CreateUserInput = {
   email: string;
   password: string;
@@ -18,6 +24,36 @@ export class UsersService {
 
   async findByEmail(email: string) {
     return this.userModel.findOne({ email: email.toLowerCase().trim() }).exec();
+  }
+
+  async findDocumentByEmail(email: string): Promise<UserDocument | null> {
+    return this.findByEmail(email);
+  }
+
+  async setPasswordResetFields(
+    email: string,
+    fields: PasswordResetFields,
+  ): Promise<boolean> {
+    const res = await this.userModel.updateOne(
+      { email: email.toLowerCase().trim() },
+      { $set: fields },
+    );
+    return res.matchedCount > 0;
+  }
+
+  async setPasswordAndClearReset(email: string, passwordHash: string): Promise<boolean> {
+    const res = await this.userModel.updateOne(
+      { email: email.toLowerCase().trim() },
+      {
+        $set: {
+          passwordHash,
+          passwordResetTokenHash: null,
+          passwordResetExpiresAt: null,
+          passwordResetRequestedAt: null,
+        },
+      },
+    );
+    return res.matchedCount > 0;
   }
 
   async createUser(input: CreateUserInput) {
