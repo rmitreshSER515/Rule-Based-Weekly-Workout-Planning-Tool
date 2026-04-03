@@ -131,8 +131,8 @@ export default function SchedulePage() {
   const [infoRule, setInfoRule] = useState<RuleDto | null>(null);
   const [isScheduleDropdownOpen, setIsScheduleDropdownOpen] = useState(false);
   const [availableSchedules, setAvailableSchedules] = useState<
-  { id: string; title: string }[]
->([]);
+    { id: string; title: string }[]
+  >([]);
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null);
 
   // Initialize dates for current week
@@ -265,7 +265,7 @@ export default function SchedulePage() {
     setStartDate(saved.startDate);
     setEndDate(saved.endDate);
     setSelectedRuleIds(saved.selectedRuleIds ?? []);
-  
+
     const normalizedCalendarExercises = Object.fromEntries(
       Object.entries(saved.calendarExercises ?? {}).map(([dateKey, items]) => [
         dateKey,
@@ -275,9 +275,9 @@ export default function SchedulePage() {
         })),
       ])
     );
-  
+
     setCalendarExercises(normalizedCalendarExercises);
-  
+
     const snapshot = JSON.stringify({
       title: saved.title,
       startDate: saved.startDate,
@@ -285,7 +285,7 @@ export default function SchedulePage() {
       selectedRuleIds: saved.selectedRuleIds ?? [],
       calendarExercises: normalizedCalendarExercises,
     });
-  
+
     setLastSavedSnapshot(snapshot);
     setScheduleLoaded(true);
   }, []);
@@ -295,12 +295,12 @@ export default function SchedulePage() {
       try {
         const saved = await fetchScheduleById(selectedScheduleId);
         if (!saved) return;
-  
+
         if (saved.userId !== userId) {
           console.warn("Schedule belongs to another user");
           return;
         }
-  
+
         applySavedSchedule(saved);
         setIsScheduleDropdownOpen(false);
       } catch (err) {
@@ -315,10 +315,10 @@ export default function SchedulePage() {
       setAvailableSchedules([]);
       return;
     }
-  
+
     try {
       const items = await fetchSchedules(userId);
-  
+
       setAvailableSchedules(
         items.map((item) => ({
           id: item.id,
@@ -330,12 +330,12 @@ export default function SchedulePage() {
       setAvailableSchedules([]);
     }
   }, [userId]);
-  
+
   useEffect(() => {
     loadSchedulesForDropdown();
   }, [loadSchedulesForDropdown]);
 
-    // Drag-and-drop state
+  // Drag-and-drop state
   const [calendarExercises, setCalendarExercises] = useState<
     Record<string, {
       id: string;
@@ -374,7 +374,7 @@ export default function SchedulePage() {
         setIsScheduleDropdownOpen(false);
       }
     };
-  
+
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
@@ -880,27 +880,37 @@ export default function SchedulePage() {
     }
   };
   const handleDeleteExercise = useCallback(
-  async (exerciseId: string) => {
-    if (!userId) return;
-    const targetExercise = exercises.find((ex) => ex.id === exerciseId);
-    if (!targetExercise) return;
-    setConfirmDelete({ id: exerciseId, name: targetExercise.name });
-  },
-  [userId, exercises]
-);
+    async (exerciseId: string) => {
+      if (!userId) return;
+      const targetExercise = exercises.find((ex) => ex.id === exerciseId);
+      if (!targetExercise) return;
+      setConfirmDelete({ id: exerciseId, name: targetExercise.name });
+    },
+    [userId, exercises]
+  );
 
-const confirmDeleteExercise = useCallback(async () => {
-  if (!confirmDelete || !userId) return;
-  const { id: exerciseId } = confirmDelete;
-  setConfirmDelete(null);
-  try {
-    await deleteExercise(exerciseId, userId);
-    setExercises((prev) => prev.filter((ex) => ex.id !== exerciseId));
-  } catch (err) {
-    console.error("Failed to delete exercise", err);
-    alert("Failed to delete exercise. Please try again.");
-  }
-}, [confirmDelete, userId, setCalendarExercises]);
+  const confirmDeleteExercise = useCallback(async () => {
+    if (!confirmDelete || !userId) return;
+    const { id: exerciseId } = confirmDelete;
+    setConfirmDelete(null);
+    try {
+      await deleteExercise(exerciseId, userId);
+      setExercises((prev) => prev.filter((ex) => ex.id !== exerciseId));
+
+      // Also remove all calendar entries that reference this exercise
+      setCalendarExercises((prev) => {
+        const updated: typeof prev = {};
+        for (const [dateKey, items] of Object.entries(prev)) {
+          const filtered = items.filter((item) => item.exerciseId !== exerciseId);
+          updated[dateKey] = filtered;
+        }
+        return updated;
+      });
+    } catch (err) {
+      console.error("Failed to delete exercise", err);
+      alert("Failed to delete exercise. Please try again.");
+    }
+  }, [confirmDelete, userId, setCalendarExercises]);
 
   const days = useMemo(() => {
     const start = parseDateKeyLocal(startDate);
@@ -1110,26 +1120,26 @@ const confirmDeleteExercise = useCallback(async () => {
       {/* Left Sidebar */}
       <div className="relative z-10 w-[300px] flex flex-col border-r border-white/15 bg-white/5 backdrop-blur-xl">
 
-      <div className="px-4 pt-4 pb-2">
-    <button
-      type="button"
-      onClick={() => navigate("/fitness")}
-      className="flex items-center gap-1.5 text-white/40 hover:text-white/80 text-xs font-medium transition-colors duration-200 group w-fit"
-    >
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-        <path
-          d="M19 12H5M5 12l7 7M5 12l7-7"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-      <span className="group-hover:underline underline-offset-2 tracking-wide uppercase">
-        Compare/create new schedules
-      </span>
-    </button>
-  </div>
+        <div className="px-4 pt-4 pb-2">
+          <button
+            type="button"
+            onClick={() => navigate("/fitness")}
+            className="flex items-center gap-1.5 text-white/40 hover:text-white/80 text-xs font-medium transition-colors duration-200 group w-fit"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M19 12H5M5 12l7 7M5 12l7-7"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span className="group-hover:underline underline-offset-2 tracking-wide uppercase">
+              Compare/create new schedules
+            </span>
+          </button>
+        </div>
 
         {/* Exercises Panel */}
         <div className="flex flex-col h-1/2 border-b border-white/15">
@@ -1140,68 +1150,68 @@ const confirmDeleteExercise = useCallback(async () => {
           </div>
           <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-2">
             {exercises.length > 0 ? exercises.map((ex) => (
-  <div
-    key={ex.id}
-    draggable
-    onDragStart={(e) => handleSidebarDragStart(e, ex)}
-    className="group rounded-lg bg-orange-500/20 border border-orange-400/30 px-3 py-2 cursor-grab active:cursor-grabbing select-none transition-all duration-150 hover:bg-orange-500/30 hover:border-orange-400/50 hover:shadow-lg hover:shadow-orange-500/10"
-  >
-    <div className="flex items-start justify-between gap-2">
-      <div className="flex items-start gap-2 min-w-0 flex-1">
-        <svg
-          className="w-4 h-4 mt-0.5 shrink-0 text-white/40"
-          viewBox="0 0 24 24"
-          fill="currentColor"
-        >
-          <circle cx="9" cy="5" r="1.5" />
-          <circle cx="15" cy="5" r="1.5" />
-          <circle cx="9" cy="12" r="1.5" />
-          <circle cx="15" cy="12" r="1.5" />
-          <circle cx="9" cy="19" r="1.5" />
-          <circle cx="15" cy="19" r="1.5" />
-        </svg>
-        <span className="w-5 h-5 mt-0.5 shrink-0 text-white/80">
-          {getExerciseIcon(ex.name, "20")}
-        </span>
-        <div className="min-w-0">
-          <p className="text-white font-medium text-sm">{ex.name}</p>
-          {ex.notes ? (
-            <p className="text-white/70 text-xs mt-1">{ex.notes}</p>
-          ) : null}
-        </div>
-      </div>
+              <div
+                key={ex.id}
+                draggable
+                onDragStart={(e) => handleSidebarDragStart(e, ex)}
+                className="group rounded-lg bg-orange-500/20 border border-orange-400/30 px-3 py-2 cursor-grab active:cursor-grabbing select-none transition-all duration-150 hover:bg-orange-500/30 hover:border-orange-400/50 hover:shadow-lg hover:shadow-orange-500/10"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-2 min-w-0 flex-1">
+                    <svg
+                      className="w-4 h-4 mt-0.5 shrink-0 text-white/40"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                    >
+                      <circle cx="9" cy="5" r="1.5" />
+                      <circle cx="15" cy="5" r="1.5" />
+                      <circle cx="9" cy="12" r="1.5" />
+                      <circle cx="15" cy="12" r="1.5" />
+                      <circle cx="9" cy="19" r="1.5" />
+                      <circle cx="15" cy="19" r="1.5" />
+                    </svg>
+                    <span className="w-5 h-5 mt-0.5 shrink-0 text-white/80">
+                      {getExerciseIcon(ex.name, "20")}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-white font-medium text-sm">{ex.name}</p>
+                      {ex.notes ? (
+                        <p className="text-white/70 text-xs mt-1">{ex.notes}</p>
+                      ) : null}
+                    </div>
+                  </div>
 
-      <button
-        type="button"
-        draggable={false}
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          void handleDeleteExercise(ex.id);
-        }}
-        className="shrink-0 rounded-md p-1 text-white/40 hover:text-red-300 hover:bg-red-500/20 opacity-0 group-hover:opacity-100 transition-all"
-        aria-label={`Delete ${ex.name}`}
-        title="Delete exercise"
-      >
-        <svg
-          className="w-4 h-4"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <polyline points="3 6 5 6 21 6" />
-          <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-          <line x1="10" y1="11" x2="10" y2="17" />
-          <line x1="14" y1="11" x2="14" y2="17" />
-        </svg>
-      </button>
-    </div>
-  </div>
-)) : (
+                  <button
+                    type="button"
+                    draggable={false}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      void handleDeleteExercise(ex.id);
+                    }}
+                    className="shrink-0 rounded-md p-1 text-white/40 hover:text-red-300 hover:bg-red-500/20 opacity-0 group-hover:opacity-100 transition-all"
+                    aria-label={`Delete ${ex.name}`}
+                    title="Delete exercise"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                      <line x1="10" y1="11" x2="10" y2="17" />
+                      <line x1="14" y1="11" x2="14" y2="17" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )) : (
               <p className="text-white/50 text-sm">No exercises yet. Add one to get started.</p>
             )}
           </div>
@@ -1218,7 +1228,7 @@ const confirmDeleteExercise = useCallback(async () => {
           </div>
         </div>
 
-        
+
 
         {/* Rules Panel */}
         <div className="flex flex-col h-1/2">
@@ -1298,176 +1308,175 @@ const confirmDeleteExercise = useCallback(async () => {
         {/* Header - shrink-0 so it never disappears */}
         <div className="relative z-30 shrink-0 overflow-visible p-4 border-b border-white/15 bg-white/5 backdrop-blur-xl">
           <div className="flex flex-nowrap items-center justify-between gap-4 mb-4">
-          <div className="flex min-w-0 shrink flex-col items-start gap-2">
-  <div ref={scheduleDropdownRef} className="relative">
-  <button
-  type="button"
-  onClick={() => setIsScheduleDropdownOpen((prev) => !prev)}
-  className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-medium text-white hover:bg-white/15 transition-colors"
->
-  <svg
-    className="h-3.5 w-3.5 text-white/50"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-    <line x1="16" y1="2" x2="16" y2="6" />
-    <line x1="8" y1="2" x2="8" y2="6" />
-    <line x1="3" y1="10" x2="21" y2="10" />
-  </svg>
-  <span className="max-w-[160px] truncate">
-  Select schedule
-  </span>
-  <svg
-    className={`h-4 w-4 text-white/50 transition-transform duration-200 ${isScheduleDropdownOpen ? "rotate-180" : ""}`}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="m6 9 6 6 6-6" />
-  </svg>
-</button>
-
-{isScheduleDropdownOpen && (
-  <div className="absolute top-full left-0 mt-2 z-[100] w-80 max-h-[min(28rem,calc(100vh-10rem))] rounded-2xl border border-white/15 bg-slate-900/95 backdrop-blur-xl shadow-2xl shadow-black/40 overflow-hidden flex flex-col">
-    {availableSchedules.length === 0 ? (
-      <div className="px-4 py-5 text-center">
-        <p className="text-white/40 text-sm">No saved schedules yet</p>
-      </div>
-    ) : (
-      <ul className="flex-1 py-1.5 overflow-y-auto overscroll-contain scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
-        {availableSchedules.map((schedule) => {
-          const isActive = schedule.id === scheduleId;
-          return (
-            <li key={schedule.id}>
-              <button
-                type="button"
-                onClick={() => loadScheduleBySelection(schedule.id)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors duration-150 ${
-                  isActive
-                    ? "bg-indigo-500/20 text-white"
-                    : "text-white/70 hover:bg-white/[0.08] hover:text-white"
-                }`}
-              >
-                {isActive ? (
+            <div className="flex min-w-0 shrink flex-col items-start gap-2">
+              <div ref={scheduleDropdownRef} className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsScheduleDropdownOpen((prev) => !prev)}
+                  className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-medium text-white hover:bg-white/15 transition-colors"
+                >
                   <svg
-                    className="h-3.5 w-3.5 shrink-0 text-indigo-400"
+                    className="h-3.5 w-3.5 text-white/50"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
-                    strokeWidth="2.5"
+                    strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   >
-                    <polyline points="20 6 9 17 4 12" />
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                    <line x1="16" y1="2" x2="16" y2="6" />
+                    <line x1="8" y1="2" x2="8" y2="6" />
+                    <line x1="3" y1="10" x2="21" y2="10" />
                   </svg>
-                ) : (
-                  <span className="h-3.5 w-3.5 shrink-0" />
+                  <span className="max-w-[160px] truncate">
+                    Select schedule
+                  </span>
+                  <svg
+                    className={`h-4 w-4 text-white/50 transition-transform duration-200 ${isScheduleDropdownOpen ? "rotate-180" : ""}`}
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </button>
+
+                {isScheduleDropdownOpen && (
+                  <div className="absolute top-full left-0 mt-2 z-[100] w-80 max-h-[min(28rem,calc(100vh-10rem))] rounded-2xl border border-white/15 bg-slate-900/95 backdrop-blur-xl shadow-2xl shadow-black/40 overflow-hidden flex flex-col">
+                    {availableSchedules.length === 0 ? (
+                      <div className="px-4 py-5 text-center">
+                        <p className="text-white/40 text-sm">No saved schedules yet</p>
+                      </div>
+                    ) : (
+                      <ul className="flex-1 py-1.5 overflow-y-auto overscroll-contain scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+                        {availableSchedules.map((schedule) => {
+                          const isActive = schedule.id === scheduleId;
+                          return (
+                            <li key={schedule.id}>
+                              <button
+                                type="button"
+                                onClick={() => loadScheduleBySelection(schedule.id)}
+                                className={`w-full flex items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors duration-150 ${isActive
+                                    ? "bg-indigo-500/20 text-white"
+                                    : "text-white/70 hover:bg-white/[0.08] hover:text-white"
+                                  }`}
+                              >
+                                {isActive ? (
+                                  <svg
+                                    className="h-3.5 w-3.5 shrink-0 text-indigo-400"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2.5"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  >
+                                    <polyline points="20 6 9 17 4 12" />
+                                  </svg>
+                                ) : (
+                                  <span className="h-3.5 w-3.5 shrink-0" />
+                                )}
+                                <span className="truncate font-medium">{schedule.title}</span>
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                    <div className="border-t border-white/10 px-3 py-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsScheduleDropdownOpen(false);
+                          navigate("/fitness", { state: { openCreate: true } });
+                        }}
+                        className="w-full flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-white/50 hover:text-white hover:bg-white/[0.08] transition-colors"
+                      >
+                        <svg
+                          className="h-3.5 w-3.5"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <line x1="12" y1="5" x2="12" y2="19" />
+                          <line x1="5" y1="12" x2="19" y2="12" />
+                        </svg>
+                        <span>New schedule</span>
+                      </button>
+                    </div>
+                  </div>
                 )}
-                <span className="truncate font-medium">{schedule.title}</span>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-    )}
-    <div className="border-t border-white/10 px-3 py-2">
-      <button
-        type="button"
-        onClick={() => {
-          setIsScheduleDropdownOpen(false);
-          navigate("/fitness", { state: { openCreate: true } });
-        }}
-        className="w-full flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-white/50 hover:text-white hover:bg-white/[0.08] transition-colors"
-      >
-        <svg
-          className="h-3.5 w-3.5"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <line x1="12" y1="5" x2="12" y2="19" />
-          <line x1="5" y1="12" x2="19" y2="12" />
-        </svg>
-        <span>New schedule</span>
-      </button>
-    </div>
-  </div>
-)}
 
-    
-  </div>
 
-  <div className="flex min-w-0 items-center gap-2">
-    {isEditingTitle ? (
-      <div className="flex items-center gap-2 min-w-0">
-        <input
-          autoFocus
-          type="text"
-          value={titleDraft}
-          onChange={(e) => setTitleDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") handleTitleSave();
-            if (e.key === "Escape") {
-              if (scheduleTitle) {
-                setTitleDraft(scheduleTitle);
-                setIsEditingTitle(false);
-              }
-            }
-          }}
-          onBlur={handleTitleSave}
-          placeholder="Name your schedule..."
-          className="text-2xl font-bold bg-transparent border-b-2 border-white/50 focus:border-white text-white placeholder-white/30 outline-none min-w-0 w-64"
-        />
-      </div>
-    ) : (
-      <>
-        <h1
-          className="truncate text-2xl font-bold text-white cursor-pointer hover:text-white/80 transition-colors"
-          onClick={() => {
-            setTitleDraft(scheduleTitle);
-            setIsEditingTitle(true);
-          }}
-          title="Click to rename"
-        >
-          {scheduleTitle}
-        </h1>
-        <button
-          onClick={() => {
-            setTitleDraft(scheduleTitle);
-            setIsEditingTitle(true);
-          }}
-          className="text-white/40 hover:text-white/80 transition-colors"
-          title="Rename schedule"
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-          </svg>
-        </button>
-      </>
-    )}
-  </div>
-</div>
+              </div>
+
+              <div className="flex min-w-0 items-center gap-2">
+                {isEditingTitle ? (
+                  <div className="flex items-center gap-2 min-w-0">
+                    <input
+                      autoFocus
+                      type="text"
+                      value={titleDraft}
+                      onChange={(e) => setTitleDraft(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleTitleSave();
+                        if (e.key === "Escape") {
+                          if (scheduleTitle) {
+                            setTitleDraft(scheduleTitle);
+                            setIsEditingTitle(false);
+                          }
+                        }
+                      }}
+                      onBlur={handleTitleSave}
+                      placeholder="Name your schedule..."
+                      className="text-2xl font-bold bg-transparent border-b-2 border-white/50 focus:border-white text-white placeholder-white/30 outline-none min-w-0 w-64"
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <h1
+                      className="truncate text-2xl font-bold text-white cursor-pointer hover:text-white/80 transition-colors"
+                      onClick={() => {
+                        setTitleDraft(scheduleTitle);
+                        setIsEditingTitle(true);
+                      }}
+                      title="Click to rename"
+                    >
+                      {scheduleTitle}
+                    </h1>
+                    <button
+                      onClick={() => {
+                        setTitleDraft(scheduleTitle);
+                        setIsEditingTitle(true);
+                      }}
+                      className="text-white/40 hover:text-white/80 transition-colors"
+                      title="Rename schedule"
+                    >
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                      </svg>
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
 
             {/*till here*/}
 
@@ -1560,56 +1569,56 @@ const confirmDeleteExercise = useCallback(async () => {
         </div>
 
         {/* Confirm Delete Exercise Modal */}
-{confirmDelete && (
-  <div
-    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-    onClick={() => setConfirmDelete(null)}
-  >
-    <div
-      className="relative w-full max-w-sm rounded-2xl border border-red-400/20 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 shadow-2xl shadow-black/60"
-      onClick={(e) => e.stopPropagation()}
-    >
-      <div className="absolute inset-0 rounded-2xl ring-1 ring-inset ring-red-500/10 pointer-events-none" />
-      <div className="relative p-6">
-        <div className="flex items-start gap-4 mb-6">
-          <div className="shrink-0 rounded-full bg-red-500/10 p-2.5 ring-1 ring-red-400/20">
-            <svg className="h-5 w-5 text-red-400/80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="3 6 5 6 21 6" />
-              <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-              <line x1="10" y1="11" x2="10" y2="17" />
-              <line x1="14" y1="11" x2="14" y2="17" />
-            </svg>
-          </div>
-          <div>
-            <h3 className="text-base font-semibold text-white/90">Delete exercise</h3>
-            <p className="mt-1.5 text-sm text-white/40 leading-relaxed">
-              Are you sure you want to delete{" "}
-              <span className="font-medium text-white/70">"{confirmDelete.name}"</span>?
-              This action cannot be undone.
-            </p>
-          </div>
-        </div>
-        <div className="flex gap-2.5">
-          <button
-            type="button"
+        {confirmDelete && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
             onClick={() => setConfirmDelete(null)}
-            className="flex-1 rounded-xl border border-white/10 bg-white/5 text-white/70 py-2.5 text-sm font-medium hover:bg-white/8 hover:text-white/90 transition-all duration-200"
           >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={confirmDeleteExercise}
-            className="flex-1 rounded-xl bg-red-500/20 border border-red-400/20 py-2.5 text-sm font-semibold text-red-300 hover:bg-red-500/30 hover:border-red-400/30 hover:text-red-200 transition-all duration-200"
-          >
-            Delete
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-)}
+            <div
+              className="relative w-full max-w-sm rounded-2xl border border-red-400/20 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 shadow-2xl shadow-black/60"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="absolute inset-0 rounded-2xl ring-1 ring-inset ring-red-500/10 pointer-events-none" />
+              <div className="relative p-6">
+                <div className="flex items-start gap-4 mb-6">
+                  <div className="shrink-0 rounded-full bg-red-500/10 p-2.5 ring-1 ring-red-400/20">
+                    <svg className="h-5 w-5 text-red-400/80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                      <line x1="10" y1="11" x2="10" y2="17" />
+                      <line x1="14" y1="11" x2="14" y2="17" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-base font-semibold text-white/90">Delete exercise</h3>
+                    <p className="mt-1.5 text-sm text-white/40 leading-relaxed">
+                      Are you sure you want to delete{" "}
+                      <span className="font-medium text-white/70">"{confirmDelete.name}"</span>?
+                      This action cannot be undone.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDelete(null)}
+                    className="flex-1 rounded-xl border border-white/10 bg-white/5 text-white/70 py-2.5 text-sm font-medium hover:bg-white/8 hover:text-white/90 transition-all duration-200"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={confirmDeleteExercise}
+                    className="flex-1 rounded-xl bg-red-500/20 border border-red-400/20 py-2.5 text-sm font-semibold text-red-300 hover:bg-red-500/30 hover:border-red-400/30 hover:text-red-200 transition-all duration-200"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Calendar Grid - one week visible per scroll, 7 days fit equally */}
         <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
@@ -1711,8 +1720,8 @@ const confirmDeleteExercise = useCallback(async () => {
                                 handleCalendarDragStart(e, item.id, getDateKey(day))
                               }
                               className={`mb-2 rounded-lg border px-2.5 py-1.5 cursor-grab active:cursor-grabbing select-none group transition-all duration-150 ${itemViolation
-                                  ? "bg-red-500/15 border-red-400/30 hover:bg-red-500/20"
-                                  : "bg-orange-500/20 border-orange-400/30 hover:bg-orange-500/30 hover:border-orange-400/50"
+                                ? "bg-red-500/15 border-red-400/30 hover:bg-red-500/20"
+                                : "bg-orange-500/20 border-orange-400/30 hover:bg-orange-500/30 hover:border-orange-400/50"
                                 }`}
                             >
                               <div className="flex items-start justify-between gap-1">
@@ -1736,20 +1745,20 @@ const confirmDeleteExercise = useCallback(async () => {
                                     )}
                                     {itemViolation && (
                                       <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-red-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-red-200 ring-1 ring-red-400/40">
-                                          <svg
-                                            className="h-3 w-3"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeWidth="2.5"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                          >
-                                            <path d="M12 9v4" />
-                                            <path d="M12 17h.01" />
-                                            <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                                          </svg>
-                                          !
+                                        <svg
+                                          className="h-3 w-3"
+                                          viewBox="0 0 24 24"
+                                          fill="none"
+                                          stroke="currentColor"
+                                          strokeWidth="2.5"
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                        >
+                                          <path d="M12 9v4" />
+                                          <path d="M12 17h.01" />
+                                          <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                                        </svg>
+                                        !
                                       </span>
                                     )}
                                   </div>
@@ -2145,14 +2154,14 @@ const confirmDeleteExercise = useCallback(async () => {
           initialRule={
             editingRule
               ? {
-                  name: editingRule.name,
-                  ifExercise: editingRule.ifExercise,
-                  ifActivityType: editingRule.ifActivityType,
-                  ifTiming: editingRule.ifTiming,
-                  thenExercise: editingRule.thenExercise,
-                  thenActivityType: editingRule.thenActivityType,
-                  thenRestriction: editingRule.thenRestriction,
-                }
+                name: editingRule.name,
+                ifExercise: editingRule.ifExercise,
+                ifActivityType: editingRule.ifActivityType,
+                ifTiming: editingRule.ifTiming,
+                thenExercise: editingRule.thenExercise,
+                thenActivityType: editingRule.thenActivityType,
+                thenRestriction: editingRule.thenRestriction,
+              }
               : undefined
           }
           onSave={ruleModalMode === "edit" ? handleEditRuleSave : handleSaveRule}
