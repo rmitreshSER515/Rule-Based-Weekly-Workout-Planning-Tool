@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common';
 import { ExercisesService } from './exercises.service';
 import { CreateExerciseDto } from './dto/create-exercise.dto';
 
@@ -34,5 +34,19 @@ export class ExercisesController {
       createdAt: exercise.get('createdAt'),
       updatedAt: exercise.get('updatedAt'),
     }));
+  }
+
+  @Delete(':id')
+  async delete(@Param('id') id: string, @Query('userId') userId: string) {
+    const exercise = await this.exercisesService.delete(id, userId);
+
+    return {
+      id: exercise._id.toString(),
+      userId: exercise.userId,
+      name: exercise.name,
+      notes: exercise.notes,
+      createdAt: exercise.get('createdAt'),
+      updatedAt: exercise.get('updatedAt'),
+    };
   }
 }

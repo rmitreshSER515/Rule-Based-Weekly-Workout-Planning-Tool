@@ -2,11 +2,12 @@ import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import CreateRuleModal from "./CreateRuleModal";
 import { logout } from "../utils/auth";
-import { fetchExercises, createExercise, type ExerciseDto } from "../api/exercises";
+import { fetchExercises, createExercise, deleteExercise, type ExerciseDto } from "../api/exercises";
 import { fetchRules, createRule, updateRule, type RuleDto } from "../api/rules";
 import {
   fetchSchedule,
   fetchScheduleById,
+  fetchSchedules,
   saveSchedule,
   type ScheduleDto,
 } from "../api/schedules";
@@ -14,6 +15,8 @@ import { getExerciseIcon } from "../utils/exerciseIcons";
 
 type IntensityLevel = "recovery" | "easy" | "medium" | "hard" | "allOut";
 
+const HIGH_INTENSITY_LEVELS = new Set<IntensityLevel>(["hard", "allOut"]);
+const RECOVERY_STREAK_THRESHOLD = 3;
 
 const intensityMeta = (level: IntensityLevel): { label: string; scale: 1 | 2 | 3 | 4 | 5; pillClass: string } => {
   switch (level) {
@@ -127,7 +130,10 @@ export default function SchedulePage() {
   const [editingRule, setEditingRule] = useState<RuleDto | null>(null);
   const [infoRule, setInfoRule] = useState<RuleDto | null>(null);
   const [isScheduleDropdownOpen, setIsScheduleDropdownOpen] = useState(false);
-  const [availableSchedules] = useState<string[]>([]);
+  const [availableSchedules, setAvailableSchedules] = useState<
+  { id: string; title: string }[]
+>([]);
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null);
 
   // Initialize dates for current week
   const today = new Date();
@@ -148,8 +154,11 @@ export default function SchedulePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState("");
-  const lastSavedSnapshotRef = useRef<string>("");
+  const [lastSavedSnapshot, setLastSavedSnapshot] = useState<string>("");
   const [scheduleLoaded, setScheduleLoaded] = useState(false);
+  const [dismissedRecoveryRecommendations, setDismissedRecoveryRecommendations] = useState<
+    Set<string>
+  >(() => new Set());
   /** When set, saves use PUT /schedules/:id; when null, POST creates a new schedule. */
   const [scheduleId, setScheduleId] = useState<string | null>(null);
   const scheduleDropdownRef = useRef<HTMLDivElement | null>(null);
@@ -248,7 +257,85 @@ export default function SchedulePage() {
     };
   }, [userId]);
 
-  // Drag-and-drop state
+  const applySavedSchedule = useCallback((saved: ScheduleDto) => {
+    setScheduleId(saved.id);
+    setScheduleTitle(saved.title);
+    setTitleDraft(saved.title);
+    setIsEditingTitle(false);
+    setStartDate(saved.startDate);
+    setEndDate(saved.endDate);
+    setSelectedRuleIds(saved.selectedRuleIds ?? []);
+  
+    const normalizedCalendarExercises = Object.fromEntries(
+      Object.entries(saved.calendarExercises ?? {}).map(([dateKey, items]) => [
+        dateKey,
+        (items ?? []).map((item) => ({
+          ...item,
+          intensity: normalizeIntensity(String(item.intensity)) ?? "easy",
+        })),
+      ])
+    );
+  
+    setCalendarExercises(normalizedCalendarExercises);
+  
+    const snapshot = JSON.stringify({
+      title: saved.title,
+      startDate: saved.startDate,
+      endDate: saved.endDate,
+      selectedRuleIds: saved.selectedRuleIds ?? [],
+      calendarExercises: normalizedCalendarExercises,
+    });
+  
+    setLastSavedSnapshot(snapshot);
+    setScheduleLoaded(true);
+  }, []);
+
+  const loadScheduleBySelection = useCallback(
+    async (selectedScheduleId: string) => {
+      try {
+        const saved = await fetchScheduleById(selectedScheduleId);
+        if (!saved) return;
+  
+        if (saved.userId !== userId) {
+          console.warn("Schedule belongs to another user");
+          return;
+        }
+  
+        applySavedSchedule(saved);
+        setIsScheduleDropdownOpen(false);
+      } catch (err) {
+        console.error("Failed to load selected schedule", err);
+      }
+    },
+    [userId, applySavedSchedule]
+  );
+
+  const loadSchedulesForDropdown = useCallback(async () => {
+    if (!userId) {
+      setAvailableSchedules([]);
+      return;
+    }
+  
+    try {
+      const items = await fetchSchedules(userId);
+  
+      setAvailableSchedules(
+        items.map((item) => ({
+          id: item.id,
+          title: item.title?.trim() || "Untitled Schedule",
+        }))
+      );
+    } catch (err) {
+      console.error("Failed to load schedules for dropdown", err);
+      setAvailableSchedules([]);
+    }
+  }, [userId]);
+  
+  useEffect(() => {
+    loadSchedulesForDropdown();
+  }, [loadSchedulesForDropdown]);
+
+    // Drag-and-drop state
   const [calendarExercises, setCalendarExercises] = useState<
     Record<string, {
       id: string;
@@ -274,9 +361,9 @@ export default function SchedulePage() {
 
   const hasUnsavedChanges = useMemo(() => {
     if (!scheduleLoaded) return false;
-    if (!lastSavedSnapshotRef.current) return true; // never saved
-    return getCurrentSnapshot() !== lastSavedSnapshotRef.current;
-  }, [getCurrentSnapshot, scheduleLoaded]);
+    if (!lastSavedSnapshot) return true; // never saved
+    return getCurrentSnapshot() !== lastSavedSnapshot;
+  }, [getCurrentSnapshot, scheduleLoaded, lastSavedSnapshot]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -299,35 +386,6 @@ export default function SchedulePage() {
     if (!userId) return;
     let cancelled = false;
 
-    const applySaved = (saved: ScheduleDto) => {
-      setScheduleId(saved.id);
-      setScheduleTitle(saved.title);
-      setTitleDraft(saved.title);
-      setIsEditingTitle(false);
-      setStartDate(saved.startDate);
-      setEndDate(saved.endDate);
-      setSelectedRuleIds(saved.selectedRuleIds ?? []);
-      const normalizedCalendarExercises = Object.fromEntries(
-        Object.entries(saved.calendarExercises ?? {}).map(([dateKey, items]) => [
-          dateKey,
-          (items ?? []).map((item) => ({
-            ...item,
-            intensity: normalizeIntensity(String(item.intensity)) ?? "easy",
-          })),
-        ])
-      );
-      setCalendarExercises(normalizedCalendarExercises);
-      setTimeout(() => {
-        lastSavedSnapshotRef.current = JSON.stringify({
-          title: saved.title,
-          startDate: saved.startDate,
-          endDate: saved.endDate,
-          selectedRuleIds: saved.selectedRuleIds ?? [],
-          calendarExercises: normalizedCalendarExercises,
-        });
-        setScheduleLoaded(true);
-      }, 0);
-    };
 
     const loadSchedule = async () => {
       try {
@@ -340,7 +398,7 @@ export default function SchedulePage() {
               setScheduleLoaded(true);
               return;
             }
-            applySaved(saved);
+            applySavedSchedule(saved);
           } else {
             setScheduleLoaded(true);
           }
@@ -356,17 +414,17 @@ export default function SchedulePage() {
         const saved = await fetchSchedule(userId);
         if (cancelled) return;
         if (saved) {
-          applySaved(saved);
+          applySavedSchedule(saved);
         } else {
           // No saved schedule — set baseline snapshot to current defaults
           // so "Unsaved changes" only appears after the user actually changes something
-          lastSavedSnapshotRef.current = JSON.stringify({
+          setLastSavedSnapshot(JSON.stringify({
             title: "",
             startDate,
             endDate,
             selectedRuleIds: [],
             calendarExercises: {},
-          });
+          }));
           setScheduleLoaded(true);
         }
       } catch (err) {
@@ -377,7 +435,7 @@ export default function SchedulePage() {
 
     loadSchedule();
     return () => { cancelled = true; };
-  }, [userId, navScheduleId, navMode]);
+  }, [userId, navScheduleId, navMode, applySavedSchedule]);
 
   // Save handler
   const handleSaveChanges = useCallback(async () => {
@@ -401,7 +459,8 @@ export default function SchedulePage() {
       if (saved?.id) {
         setScheduleId(saved.id);
       }
-      lastSavedSnapshotRef.current = getCurrentSnapshot();
+      await loadSchedulesForDropdown();
+      setLastSavedSnapshot(getCurrentSnapshot());
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2500);
     } catch (err: any) {
@@ -411,7 +470,17 @@ export default function SchedulePage() {
     } finally {
       setIsSaving(false);
     }
-  }, [userId, scheduleId, scheduleTitle, startDate, endDate, selectedRuleIds, calendarExercises, getCurrentSnapshot]);
+  }, [
+    userId,
+    scheduleId,
+    scheduleTitle,
+    startDate,
+    endDate,
+    selectedRuleIds,
+    calendarExercises,
+    getCurrentSnapshot,
+    loadSchedulesForDropdown,
+  ]);
 
   // Intensity & duration popup state
   const [pendingDrop, setPendingDrop] = useState<{
@@ -514,9 +583,6 @@ export default function SchedulePage() {
     [rules, selectedRuleIds]
   );
 
-  const scheduleOptions = useMemo(() => {
-    return availableSchedules.filter((name) => name.trim().length > 0);
-  }, [availableSchedules]);
 
   const ruleViolations = useMemo(() => {
     if (selectedRules.length === 0) return new Map<string, string>();
@@ -813,6 +879,28 @@ export default function SchedulePage() {
       setAddExerciseNameError(err?.message ?? "Failed to create exercise");
     }
   };
+  const handleDeleteExercise = useCallback(
+  async (exerciseId: string) => {
+    if (!userId) return;
+    const targetExercise = exercises.find((ex) => ex.id === exerciseId);
+    if (!targetExercise) return;
+    setConfirmDelete({ id: exerciseId, name: targetExercise.name });
+  },
+  [userId, exercises]
+);
+
+const confirmDeleteExercise = useCallback(async () => {
+  if (!confirmDelete || !userId) return;
+  const { id: exerciseId } = confirmDelete;
+  setConfirmDelete(null);
+  try {
+    await deleteExercise(exerciseId, userId);
+    setExercises((prev) => prev.filter((ex) => ex.id !== exerciseId));
+  } catch (err) {
+    console.error("Failed to delete exercise", err);
+    alert("Failed to delete exercise. Please try again.");
+  }
+}, [confirmDelete, userId, setCalendarExercises]);
 
   const days = useMemo(() => {
     const start = parseDateKeyLocal(startDate);
@@ -827,6 +915,86 @@ export default function SchedulePage() {
     }
     return result;
   }, [days]);
+
+  const recoveryRecommendations = useMemo(() => {
+    if (days.length === 0) return [];
+
+    let streak = 0;
+    const recommendations: { dateKey: string; message: string }[] = [];
+    const seen = new Set<string>();
+
+    for (let i = 0; i < days.length; i += 1) {
+      const dateKey = getDateKey(days[i]);
+      const items = calendarExercises[dateKey] || [];
+      const isHighDay = items.some((item) =>
+        HIGH_INTENSITY_LEVELS.has(item.intensity)
+      );
+
+      if (isHighDay) {
+        streak += 1;
+      } else {
+        streak = 0;
+      }
+
+      if (isHighDay && streak === RECOVERY_STREAK_THRESHOLD) {
+        const targetIndex = i + 1;
+        if (targetIndex < days.length) {
+          const targetKey = getDateKey(days[targetIndex]);
+          const targetItems = calendarExercises[targetKey] || [];
+          const hasRecovery = targetItems.some((item) => item.intensity === "recovery");
+          if (!hasRecovery && !seen.has(targetKey)) {
+            const targetLabel = formatDayName(days[targetIndex]);
+            recommendations.push({
+              dateKey: targetKey,
+              message: `You have ${RECOVERY_STREAK_THRESHOLD} high-intensity days in a row. Consider a recovery day on ${targetLabel}.`,
+            });
+            seen.add(targetKey);
+          }
+        }
+      }
+    }
+
+    return recommendations.filter(
+      (rec) => !dismissedRecoveryRecommendations.has(rec.dateKey)
+    );
+  }, [days, calendarExercises, dismissedRecoveryRecommendations]);
+
+  const applyRecoveryRecommendation = useCallback((dateKey: string) => {
+    setCalendarExercises((prev) => {
+      const items = prev[dateKey] || [];
+      if (items.length === 0) {
+        return {
+          ...prev,
+          [dateKey]: [
+            {
+              id: crypto.randomUUID(),
+              exerciseId: "recovery",
+              name: "Recovery",
+              notes: "Auto-suggested recovery day",
+              intensity: "recovery",
+              duration: { hours: "", minutes: "" },
+            },
+          ],
+        };
+      }
+
+      return {
+        ...prev,
+        [dateKey]: items.map((item) => ({
+          ...item,
+          intensity: "recovery",
+        })),
+      };
+    });
+  }, []);
+
+  const dismissRecoveryRecommendation = useCallback((dateKey: string) => {
+    setDismissedRecoveryRecommendations((prev) => {
+      const next = new Set(prev);
+      next.add(dateKey);
+      return next;
+    });
+  }, []);
 
   const toggleRuleSelection = (ruleId: string) => {
     setSelectedRuleIds((prev) =>
@@ -972,38 +1140,68 @@ export default function SchedulePage() {
           </div>
           <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-2">
             {exercises.length > 0 ? exercises.map((ex) => (
-              <div
-                key={ex.id}
-                draggable
-                onDragStart={(e) => handleSidebarDragStart(e, ex)}
-                className="rounded-lg bg-orange-500/20 border border-orange-400/30 px-3 py-2 cursor-grab active:cursor-grabbing select-none transition-all duration-150 hover:bg-orange-500/30 hover:border-orange-400/50 hover:shadow-lg hover:shadow-orange-500/10"
-              >
-                <div className="flex items-start gap-2">
-                  {/* Grip handle */}
-                  <svg
-                    className="w-4 h-4 mt-0.5 shrink-0 text-white/40"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                  >
-                    <circle cx="9" cy="5" r="1.5" />
-                    <circle cx="15" cy="5" r="1.5" />
-                    <circle cx="9" cy="12" r="1.5" />
-                    <circle cx="15" cy="12" r="1.5" />
-                    <circle cx="9" cy="19" r="1.5" />
-                    <circle cx="15" cy="19" r="1.5" />
-                  </svg>
-                  <span className="w-5 h-5 mt-0.5 text-white/80">
-                    {getExerciseIcon(ex.name, "20")}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-white font-medium text-sm">{ex.name}</p>
-                    {ex.notes ? (
-                      <p className="text-white/70 text-xs mt-1">{ex.notes}</p>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-            )) : (
+  <div
+    key={ex.id}
+    draggable
+    onDragStart={(e) => handleSidebarDragStart(e, ex)}
+    className="group rounded-lg bg-orange-500/20 border border-orange-400/30 px-3 py-2 cursor-grab active:cursor-grabbing select-none transition-all duration-150 hover:bg-orange-500/30 hover:border-orange-400/50 hover:shadow-lg hover:shadow-orange-500/10"
+  >
+    <div className="flex items-start justify-between gap-2">
+      <div className="flex items-start gap-2 min-w-0 flex-1">
+        <svg
+          className="w-4 h-4 mt-0.5 shrink-0 text-white/40"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+        >
+          <circle cx="9" cy="5" r="1.5" />
+          <circle cx="15" cy="5" r="1.5" />
+          <circle cx="9" cy="12" r="1.5" />
+          <circle cx="15" cy="12" r="1.5" />
+          <circle cx="9" cy="19" r="1.5" />
+          <circle cx="15" cy="19" r="1.5" />
+        </svg>
+        <span className="w-5 h-5 mt-0.5 shrink-0 text-white/80">
+          {getExerciseIcon(ex.name, "20")}
+        </span>
+        <div className="min-w-0">
+          <p className="text-white font-medium text-sm">{ex.name}</p>
+          {ex.notes ? (
+            <p className="text-white/70 text-xs mt-1">{ex.notes}</p>
+          ) : null}
+        </div>
+      </div>
+
+      <button
+        type="button"
+        draggable={false}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          void handleDeleteExercise(ex.id);
+        }}
+        className="shrink-0 rounded-md p-1 text-white/40 hover:text-red-300 hover:bg-red-500/20 opacity-0 group-hover:opacity-100 transition-all"
+        aria-label={`Delete ${ex.name}`}
+        title="Delete exercise"
+      >
+        <svg
+          className="w-4 h-4"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <polyline points="3 6 5 6 21 6" />
+          <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+          <line x1="10" y1="11" x2="10" y2="17" />
+          <line x1="14" y1="11" x2="14" y2="17" />
+        </svg>
+      </button>
+    </div>
+  </div>
+)) : (
               <p className="text-white/50 text-sm">No exercises yet. Add one to get started.</p>
             )}
           </div>
@@ -1019,6 +1217,8 @@ export default function SchedulePage() {
             </button>
           </div>
         </div>
+
+        
 
         {/* Rules Panel */}
         <div className="flex flex-col h-1/2">
@@ -1094,57 +1294,118 @@ export default function SchedulePage() {
       </div>
 
       {/* Right Side - Calendar */}
-      <div className="relative z-10 flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="relative z-10 flex-1 flex flex-col min-w-0 overflow-visible">
         {/* Header - shrink-0 so it never disappears */}
-        <div className="shrink-0 p-4 border-b border-white/15 bg-white/5 backdrop-blur-xl">
+        <div className="relative z-30 shrink-0 overflow-visible p-4 border-b border-white/15 bg-white/5 backdrop-blur-xl">
           <div className="flex flex-nowrap items-center justify-between gap-4 mb-4">
           <div className="flex min-w-0 shrink flex-col items-start gap-2">
   <div ref={scheduleDropdownRef} className="relative">
-    <button
-      type="button"
-      onClick={() => setIsScheduleDropdownOpen((prev) => !prev)}
-      className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-medium text-white hover:bg-white/15 transition-colors"
-    >
-      <span>Select schedule</span>
-      <svg
-        className={`h-4 w-4 transition-transform ${isScheduleDropdownOpen ? "rotate-180" : ""}`}
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="m6 9 6 6 6-6" />
-      </svg>
-    </button>
+  <button
+  type="button"
+  onClick={() => setIsScheduleDropdownOpen((prev) => !prev)}
+  className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-medium text-white hover:bg-white/15 transition-colors"
+>
+  <svg
+    className="h-3.5 w-3.5 text-white/50"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+    <line x1="16" y1="2" x2="16" y2="6" />
+    <line x1="8" y1="2" x2="8" y2="6" />
+    <line x1="3" y1="10" x2="21" y2="10" />
+  </svg>
+  <span className="max-w-[160px] truncate">
+  Select schedule
+  </span>
+  <svg
+    className={`h-4 w-4 text-white/50 transition-transform duration-200 ${isScheduleDropdownOpen ? "rotate-180" : ""}`}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="m6 9 6 6 6-6" />
+  </svg>
+</button>
 
-    {isScheduleDropdownOpen && (
-      <div className="absolute left-0 top-full z-30 mt-2 w-64 overflow-hidden rounded-xl border border-white/15 bg-slate-900 shadow-xl">
-        <div className="border-b border-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white/50">
-          Schedules
-        </div>
-
-        <div className="max-h-64 overflow-y-auto py-1">
-          {scheduleOptions.length > 0 ? (
-            scheduleOptions.map((scheduleName) => (
-              <button
-                key={scheduleName}
-                type="button"
-                onClick={() => setIsScheduleDropdownOpen(false)}
-                className="block w-full px-3 py-2 text-left text-sm text-white/85 hover:bg-white/10 transition-colors"
-              >
-                <span className="truncate block">{scheduleName}</span>
-              </button>
-            ))
-          ) : (
-            <div className="px-3 py-2 text-sm text-white/50">
-              No schedules available
-            </div>
-          )}
-        </div>
+{isScheduleDropdownOpen && (
+  <div className="absolute top-full left-0 mt-2 z-[100] w-80 max-h-[min(28rem,calc(100vh-10rem))] rounded-2xl border border-white/15 bg-slate-900/95 backdrop-blur-xl shadow-2xl shadow-black/40 overflow-hidden flex flex-col">
+    {availableSchedules.length === 0 ? (
+      <div className="px-4 py-5 text-center">
+        <p className="text-white/40 text-sm">No saved schedules yet</p>
       </div>
+    ) : (
+      <ul className="flex-1 py-1.5 overflow-y-auto overscroll-contain scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+        {availableSchedules.map((schedule) => {
+          const isActive = schedule.id === scheduleId;
+          return (
+            <li key={schedule.id}>
+              <button
+                type="button"
+                onClick={() => loadScheduleBySelection(schedule.id)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors duration-150 ${
+                  isActive
+                    ? "bg-indigo-500/20 text-white"
+                    : "text-white/70 hover:bg-white/[0.08] hover:text-white"
+                }`}
+              >
+                {isActive ? (
+                  <svg
+                    className="h-3.5 w-3.5 shrink-0 text-indigo-400"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                ) : (
+                  <span className="h-3.5 w-3.5 shrink-0" />
+                )}
+                <span className="truncate font-medium">{schedule.title}</span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
     )}
+    <div className="border-t border-white/10 px-3 py-2">
+      <button
+        type="button"
+        onClick={() => {
+          setIsScheduleDropdownOpen(false);
+          navigate("/fitness", { state: { openCreate: true } });
+        }}
+        className="w-full flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-white/50 hover:text-white hover:bg-white/[0.08] transition-colors"
+      >
+        <svg
+          className="h-3.5 w-3.5"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+        <span>New schedule</span>
+      </button>
+    </div>
+  </div>
+)}
+
+    
   </div>
 
   <div className="flex min-w-0 items-center gap-2">
@@ -1298,8 +1559,113 @@ export default function SchedulePage() {
           </div>
         </div>
 
+        {/* Confirm Delete Exercise Modal */}
+{confirmDelete && (
+  <div
+    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+    onClick={() => setConfirmDelete(null)}
+  >
+    <div
+      className="relative w-full max-w-sm rounded-2xl border border-red-400/20 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 shadow-2xl shadow-black/60"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="absolute inset-0 rounded-2xl ring-1 ring-inset ring-red-500/10 pointer-events-none" />
+      <div className="relative p-6">
+        <div className="flex items-start gap-4 mb-6">
+          <div className="shrink-0 rounded-full bg-red-500/10 p-2.5 ring-1 ring-red-400/20">
+            <svg className="h-5 w-5 text-red-400/80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+              <line x1="10" y1="11" x2="10" y2="17" />
+              <line x1="14" y1="11" x2="14" y2="17" />
+            </svg>
+          </div>
+          <div>
+            <h3 className="text-base font-semibold text-white/90">Delete exercise</h3>
+            <p className="mt-1.5 text-sm text-white/40 leading-relaxed">
+              Are you sure you want to delete{" "}
+              <span className="font-medium text-white/70">"{confirmDelete.name}"</span>?
+              This action cannot be undone.
+            </p>
+          </div>
+        </div>
+        <div className="flex gap-2.5">
+          <button
+            type="button"
+            onClick={() => setConfirmDelete(null)}
+            className="flex-1 rounded-xl border border-white/10 bg-white/5 text-white/70 py-2.5 text-sm font-medium hover:bg-white/8 hover:text-white/90 transition-all duration-200"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={confirmDeleteExercise}
+            className="flex-1 rounded-xl bg-red-500/20 border border-red-400/20 py-2.5 text-sm font-semibold text-red-300 hover:bg-red-500/30 hover:border-red-400/30 hover:text-red-200 transition-all duration-200"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
+
         {/* Calendar Grid - one week visible per scroll, 7 days fit equally */}
         <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
+          {recoveryRecommendations.length > 0 && (
+            <div className="mx-auto w-full max-w-[1280px] px-4 pt-4">
+              <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h3 className="text-white font-semibold text-sm">
+                      Recovery recommendations
+                    </h3>
+                    <p className="text-white/60 text-xs mt-1">
+                      Suggested based on {RECOVERY_STREAK_THRESHOLD} consecutive high-intensity days.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 space-y-3">
+                  {recoveryRecommendations.map((rec) => (
+                    <div
+                      key={rec.dateKey}
+                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border border-white/10 bg-white/5 px-3.5 py-3"
+                    >
+                      <div className="flex-1 text-sm text-white/80">{rec.message}</div>
+                      <div className="shrink-0 flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => applyRecoveryRecommendation(rec.dateKey)}
+                          className="rounded-lg bg-emerald-500/20 text-emerald-200 border border-emerald-400/30 px-3 py-1.5 text-xs font-semibold hover:bg-emerald-500/30 transition-colors"
+                        >
+                          Apply
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => dismissRecoveryRecommendation(rec.dateKey)}
+                          className="inline-flex items-center justify-center rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-xs text-white/70 hover:bg-white/10 transition-colors"
+                          aria-label="Dismiss recommendation"
+                          title="Dismiss recommendation"
+                        >
+                          <svg
+                            className="h-3.5 w-3.5"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
+                          >
+                            <path d="M18 6L6 18M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
           <div
             className="schedule-calendar-scroll mx-auto flex-1 min-h-0 w-full max-w-[1280px] overflow-x-auto overflow-y-hidden scroll-smooth [container-type:inline-size]"
             style={{
