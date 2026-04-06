@@ -96,5 +96,8 @@ export class RulesService {
       .sort({ createdAt: 1 })
       .exec();
   }
+  async remove(id: string, userId: string): Promise<RuleDocument | null> {
+  return this.ruleModel.findOneAndDelete({ _id: id, userId }).exec();
+}
 }
 

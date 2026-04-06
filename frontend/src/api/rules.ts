@@ -78,3 +78,14 @@ export async function updateRule(id: string, input: CreateRuleInput): Promise<Ru
   return data as RuleDto;
 }
 
+export async function deleteRule(id: string, userId: string): Promise<void> {
+  const res = await fetch(`${API_URL}/rules/${id}?userId=${userId}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data?.message ?? "Failed to delete rule");
+  }
+}
+
