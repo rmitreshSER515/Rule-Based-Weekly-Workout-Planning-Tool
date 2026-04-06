@@ -8,6 +8,7 @@ import {
   Param,
   Patch,
   Post,
+  Delete,
   Query,
 } from '@nestjs/common';
 
@@ -86,5 +87,14 @@ export class RulesController {
       updatedAt: rule.get('updatedAt'),
     }));
   }
+
+  @Delete(':id')
+@HttpCode(HttpStatus.NO_CONTENT)
+async remove(@Param('id') id: string, @Query('userId') userId: string) {
+  const rule = await this.rulesService.remove(id, userId);
+  if (!rule) {
+    throw new NotFoundException('Rule not found');
+  }
+}
 }
 

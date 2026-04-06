@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import CreateRuleModal from "./CreateRuleModal";
 import { logout } from "../utils/auth";
 import { fetchExercises, createExercise, deleteExercise, type ExerciseDto } from "../api/exercises";
-import { fetchRules, createRule, updateRule, type RuleDto } from "../api/rules";
+import { fetchRules, createRule, updateRule, deleteRule, type RuleDto } from "../api/rules";
 import {
   fetchSchedule,
   fetchScheduleById,
@@ -134,6 +134,7 @@ export default function SchedulePage() {
     { id: string; title: string }[]
   >([]);
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null);
+  const [confirmDeleteRule, setConfirmDeleteRule] = useState<{ id: string; name: string } | null>(null);
 
   // Initialize dates for current week
   const today = new Date();
@@ -912,6 +913,29 @@ export default function SchedulePage() {
     }
   }, [confirmDelete, userId, setCalendarExercises]);
 
+const handleDeleteRule = useCallback(
+  (ruleId: string) => {
+    const target = rules.find((r) => r.id === ruleId);
+    if (!target) return;
+    setConfirmDeleteRule({ id: ruleId, name: target.name });
+  },
+  [rules]
+);
+
+const confirmDeleteRuleAction = useCallback(async () => {
+  if (!confirmDeleteRule || !userId) return;
+  const { id: ruleId } = confirmDeleteRule;
+  setConfirmDeleteRule(null);
+  try {
+    await deleteRule(ruleId, userId);
+    setRules((prev) => prev.filter((r) => r.id !== ruleId));
+    setSelectedRuleIds((prev) => prev.filter((id) => id !== ruleId));
+  } catch (err) {
+    console.error("Failed to delete rule", err);
+    alert("Failed to delete rule. Please try again.");
+  }
+}, [confirmDeleteRule, userId]);
+
   const days = useMemo(() => {
     const start = parseDateKeyLocal(startDate);
     const end = parseDateKeyLocal(endDate);
@@ -1278,6 +1302,29 @@ export default function SchedulePage() {
                         <path d="M12 8h.01" />
                       </svg>
                     </button>
+                    <button
+  type="button"
+  onClick={() => handleDeleteRule(rule.id)}
+  className="shrink-0 rounded-md p-1 text-white/40 hover:text-red-300 hover:bg-red-500/20 transition-colors"
+  aria-label={`Delete rule ${rule.name}`}
+  title="Delete rule"
+>
+  <svg
+    className="w-4 h-4"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <polyline points="3 6 5 6 21 6" />
+    <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+    <line x1="10" y1="11" x2="10" y2="17" />
+    <line x1="14" y1="11" x2="14" y2="17" />
+  </svg>
+</button>
                   </div>
                 ))}
               </div>
@@ -1619,6 +1666,58 @@ export default function SchedulePage() {
             </div>
           </div>
         )}
+
+{/* Confirm Delete Rule Modal */}
+{confirmDeleteRule && (
+  <div
+    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+    onClick={() => setConfirmDeleteRule(null)}
+  >
+    <div
+      className="relative w-full max-w-sm rounded-2xl border border-red-400/20 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 shadow-2xl shadow-black/60"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="absolute inset-0 rounded-2xl ring-1 ring-inset ring-red-500/10 pointer-events-none" />
+      <div className="relative p-6">
+        <div className="flex items-start gap-4 mb-6">
+          <div className="shrink-0 rounded-full bg-red-500/10 p-2.5 ring-1 ring-red-400/20">
+            <svg className="h-5 w-5 text-red-400/80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+              <line x1="10" y1="11" x2="10" y2="17" />
+              <line x1="14" y1="11" x2="14" y2="17" />
+            </svg>
+          </div>
+          <div>
+            <h3 className="text-base font-semibold text-white/90">Delete rule</h3>
+            <p className="mt-1.5 text-sm text-white/40 leading-relaxed">
+              Are you sure you want to delete{" "}
+              <span className="font-medium text-white/70">"{confirmDeleteRule.name}"</span>?
+              This will also deselect it from the current schedule.
+            </p>
+          </div>
+        </div>
+        <div className="flex gap-2.5">
+          <button
+            type="button"
+            onClick={() => setConfirmDeleteRule(null)}
+            className="flex-1 rounded-xl border border-white/10 bg-white/5 text-white/70 py-2.5 text-sm font-medium hover:bg-white/8 hover:text-white/90 transition-all duration-200"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={confirmDeleteRuleAction}
+            className="flex-1 rounded-xl bg-red-500/20 border border-red-400/20 py-2.5 text-sm font-semibold text-red-300 hover:bg-red-500/30 hover:border-red-400/30 hover:text-red-200 transition-all duration-200"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
 
         {/* Calendar Grid - one week visible per scroll, 7 days fit equally */}
         <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
