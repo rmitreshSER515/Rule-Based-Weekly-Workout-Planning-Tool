@@ -118,6 +118,17 @@ export default function FitnessTrackerPage() {
       setNotifications((prev) =>
         prev.map((n) => (n.id === updated.id ? updated : n))
       );
+      if (status === "accepted") {
+        const items = await fetchSchedules(userId);
+        setSchedules(
+          items.map((item) => ({
+            id: item.id,
+            title: item.title,
+            startDate: item.startDate,
+            endDate: item.endDate,
+          }))
+        );
+      }
     } catch (err) {
       console.error("Failed to update notification", err);
     }
