@@ -62,4 +62,33 @@ export class UsersService {
       phoneNumber: user.phoneNumber,
     };
   }
+
+  async searchUsers(query: string) {
+    const normalized = query.trim().toLowerCase();
+    const filter =
+      normalized.length === 0
+        ? {}
+        : {
+            $or: [
+              { firstName: { $regex: normalized, $options: 'i' } },
+              { lastName: { $regex: normalized, $options: 'i' } },
+              { email: { $regex: normalized, $options: 'i' } },
+            ],
+          };
+
+    const users = await this.userModel
+      .find(filter)
+      .sort({ firstName: 1, lastName: 1 })
+      .limit(50)
+      .exec();
+
+    return users.map((user) => ({
+      id: user._id.toString(),
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      phoneNumber: user.phoneNumber,
+      role: user.role,
+    }));
+  }
 }
