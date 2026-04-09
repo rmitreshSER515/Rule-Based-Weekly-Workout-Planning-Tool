@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { logout } from "../utils/auth";
-import { fetchSchedules } from "../api/schedules";
+import { fetchSchedules, deleteSchedule } from "../api/schedules";
 import {
   fetchNotifications,
   updateNotificationStatus,
@@ -27,6 +27,10 @@ export default function FitnessTrackerPage() {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationDto[]>([]);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [confirmDeleteSchedule, setConfirmDeleteSchedule] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
 
   const [selectedScheduleIds, setSelectedScheduleIds] = useState<string[]>([]);
   const canCompare = selectedScheduleIds.length >= 2;
@@ -105,6 +109,26 @@ export default function FitnessTrackerPage() {
   }, [schedules]);
 
   const handleLogout = () => logout(navigate);
+
+  const handleDeleteSchedule = (schedule: ScheduleCard) => {
+    setConfirmDeleteSchedule({
+      id: schedule.id,
+      title: schedule.title || "Untitled Schedule",
+    });
+  };
+
+  const confirmDeleteScheduleAction = async () => {
+    if (!confirmDeleteSchedule || !userId) return;
+    const target = confirmDeleteSchedule;
+    setConfirmDeleteSchedule(null);
+    try {
+      await deleteSchedule(target.id, userId);
+      setSchedules((prev) => prev.filter((s) => s.id !== target.id));
+      setSelectedScheduleIds((prev) => prev.filter((id) => id !== target.id));
+    } catch (err) {
+      console.error("Failed to delete schedule", err);
+    }
+  };
   const handleNotificationAction = async (
     notificationId: string,
     status: "accepted" | "declined"
@@ -332,9 +356,23 @@ export default function FitnessTrackerPage() {
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="rounded-xl border border-white/20 bg-white/5 px-4 py-2.5 text-sm font-medium text-white/90 backdrop-blur-xl transition-colors hover:bg-white/10 hover:text-white"
+                  className="rounded-xl border border-white/20 bg-white/5 p-2.5 text-white/80 backdrop-blur-xl transition-colors hover:bg-white/10 hover:text-white"
+                  aria-label="Log out"
+                  title="Log out"
                 >
-                  Log out
+                  <svg
+                    className="h-5 w-5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
+                  </svg>
                 </button>
               </div>
             </div>
@@ -472,6 +510,33 @@ export default function FitnessTrackerPage() {
                           <path d="M20 6 9 17l-5-5" />
                         </svg>
                       </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleDeleteSchedule(schedule);
+                        }}
+                        className="absolute right-4 bottom-4 z-10 inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/15 bg-white/5 text-white/50 transition-colors hover:bg-red-500/20 hover:text-red-200"
+                        aria-label={`Delete ${schedule.title ?? "schedule"}`}
+                        title="Delete schedule"
+                      >
+                        <svg
+                          className="h-4 w-4"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                          <line x1="10" y1="11" x2="10" y2="17" />
+                          <line x1="14" y1="11" x2="14" y2="17" />
+                        </svg>
+                      </button>
 
                       <div className="mb-4 border-b border-white/10 pb-4 pr-12">
                         <h3 className="line-clamp-2 text-2xl font-bold leading-tight text-white">
@@ -526,6 +591,59 @@ export default function FitnessTrackerPage() {
         onClose={() => setIsShareModalOpen(false)}
         schedules={selectedSchedulePreviews}
       />
+
+      {confirmDeleteSchedule && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={() => setConfirmDeleteSchedule(null)}
+        >
+          <div
+            className="relative w-full max-w-sm rounded-2xl border border-red-400/20 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 shadow-2xl shadow-black/60"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="absolute inset-0 rounded-2xl ring-1 ring-inset ring-red-500/10 pointer-events-none" />
+            <div className="relative p-6">
+              <div className="flex items-start gap-4 mb-6">
+                <div className="shrink-0 rounded-full bg-red-500/10 p-2.5 ring-1 ring-red-400/20">
+                  <svg className="h-5 w-5 text-red-400/80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                    <line x1="10" y1="11" x2="10" y2="17" />
+                    <line x1="14" y1="11" x2="14" y2="17" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-white/90">Delete schedule</h3>
+                  <p className="mt-1.5 text-sm text-white/40 leading-relaxed">
+                    Are you sure you want to delete{" "}
+                    <span className="font-medium text-white/70">
+                      "{confirmDeleteSchedule.title}"
+                    </span>
+                    ? This action cannot be undone.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setConfirmDeleteSchedule(null)}
+                  className="flex-1 rounded-xl border border-white/10 bg-white/5 text-white/70 py-2.5 text-sm font-medium hover:bg-white/8 hover:text-white/90 transition-all duration-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmDeleteScheduleAction}
+                  className="flex-1 rounded-xl bg-red-500/20 border border-red-400/20 py-2.5 text-sm font-semibold text-red-300 hover:bg-red-500/30 hover:border-red-400/30 hover:text-red-200 transition-all duration-200"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
