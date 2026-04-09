@@ -1,6 +1,9 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import CreateRuleModal from "./CreateRuleModal";
+import ShareSchedulesModal, {
+  type ShareableScheduleSummary,
+} from "./ShareSchedulesModal";
 import { logout } from "../utils/auth";
 import { fetchExercises, createExercise, deleteExercise, type ExerciseDto } from "../api/exercises";
 import { fetchRules, createRule, updateRule, deleteRule, type RuleDto } from "../api/rules";
@@ -155,6 +158,7 @@ export default function SchedulePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [lastSavedSnapshot, setLastSavedSnapshot] = useState<string>("");
   const [scheduleLoaded, setScheduleLoaded] = useState(false);
   const [dismissedRecoveryRecommendations, setDismissedRecoveryRecommendations] = useState<
@@ -359,6 +363,25 @@ export default function SchedulePage() {
       calendarExercises,
     });
   }, [scheduleTitle, startDate, endDate, selectedRuleIds, calendarExercises]);
+
+  const currentScheduleSharePreview = useMemo<ShareableScheduleSummary[]>(() => {
+    const title = scheduleTitle.trim() || "Untitled Schedule";
+    const exerciseCount = Object.values(calendarExercises).reduce(
+      (total, items) => total + items.length,
+      0,
+    );
+
+    return [
+      {
+        id: scheduleId ?? "draft-schedule",
+        title,
+        startDate,
+        endDate,
+        exerciseCount,
+        selectedRuleCount: selectedRuleIds.length,
+      },
+    ];
+  }, [calendarExercises, endDate, scheduleId, scheduleTitle, selectedRuleIds.length, startDate]);
 
   const hasUnsavedChanges = useMemo(() => {
     if (!scheduleLoaded) return false;
@@ -1562,6 +1585,28 @@ const confirmDeleteExercise = useCallback(async () => {
               </button>
               <button
                 type="button"
+                onClick={() => setIsShareModalOpen(true)}
+                className="relative z-10 inline-flex items-center gap-2 rounded-lg border border-cyan-400/25 bg-cyan-400/10 px-4 py-2 text-sm font-medium text-cyan-100 transition-colors hover:bg-cyan-400/15 hover:text-white"
+              >
+                <svg
+                  className="h-4 w-4 shrink-0"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="18" cy="5" r="3" />
+                  <circle cx="6" cy="12" r="3" />
+                  <circle cx="18" cy="19" r="3" />
+                  <path d="m8.59 13.51 6.83 3.98" />
+                  <path d="m15.41 6.51-6.82 3.98" />
+                </svg>
+                <span>Share</span>
+              </button>
+              <button
+                type="button"
                 onClick={handleSaveChanges}
                 disabled={isSaving || !scheduleTitle.trim()}
                 className="group relative inline-flex items-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 px-6 py-3 font-semibold text-white shadow-lg shadow-emerald-500/25 transition-all duration-300 hover:shadow-xl hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
@@ -2097,6 +2142,12 @@ const confirmDeleteExercise = useCallback(async () => {
           </div>
         </div>
       )}
+
+      <ShareSchedulesModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        schedules={currentScheduleSharePreview}
+      />
 
       {/* Add Exercise Modal */}
       {showAddExerciseModal && (

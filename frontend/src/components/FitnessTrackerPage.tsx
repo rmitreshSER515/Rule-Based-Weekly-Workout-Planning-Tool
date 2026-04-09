@@ -2,6 +2,9 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { logout } from "../utils/auth";
 import { fetchSchedules } from "../api/schedules";
+import ShareSchedulesModal, {
+  type ShareableScheduleSummary,
+} from "./ShareSchedulesModal";
 
 type ScheduleCard = {
   id: string;
@@ -16,9 +19,11 @@ export default function FitnessTrackerPage() {
   const navigate = useNavigate();
   const [schedules, setSchedules] = useState<ScheduleCard[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
   const [selectedScheduleIds, setSelectedScheduleIds] = useState<string[]>([]);
   const canCompare = selectedScheduleIds.length >= 2;
+  const canShare = selectedScheduleIds.length >= 1;
 
   
   const [searchQuery, setSearchQuery] = useState("");
@@ -104,6 +109,16 @@ export default function FitnessTrackerPage() {
       return ta.localeCompare(tb);
     });
 
+  const selectedSchedulePreviews: ShareableScheduleSummary[] = schedules
+    .filter((schedule) => selectedScheduleIds.includes(schedule.id))
+    .map((schedule) => ({
+      id: schedule.id,
+      title: schedule.title || "Untitled Schedule",
+      startDate: schedule.startDate,
+      endDate: schedule.endDate,
+      exerciseCount: schedule.exerciseCount,
+    }));
+
   return (
     <div className="min-h-screen w-full relative overflow-hidden bg-slate-950">
       <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-950" />
@@ -132,6 +147,25 @@ export default function FitnessTrackerPage() {
               </div>
 
               <div className="absolute right-6 top-8 flex items-center gap-3">
+                <button
+                  type="button"
+                  disabled={!canShare}
+                  onClick={() => setIsShareModalOpen(true)}
+                  title={
+                    canShare
+                      ? "Preview selected schedules for sharing"
+                      : "Select at least 1 schedule to share"
+                  }
+                  className={`rounded-xl border px-5 py-2.5 text-sm font-semibold backdrop-blur-xl transition-all
+                    ${
+                      canShare
+                        ? "border-cyan-400/30 bg-cyan-400/10 text-cyan-100 hover:bg-cyan-400/15 hover:text-white hover:shadow-lg hover:shadow-cyan-500/10"
+                        : "border-white/10 bg-white/5 text-white/40 opacity-60 cursor-not-allowed"
+                    }`}
+                >
+                  Share Schedules
+                </button>
+
                 <button
                   type="button"
                   disabled={!canCompare}
@@ -167,11 +201,11 @@ export default function FitnessTrackerPage() {
           <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
             <div className="mb-6 flex items-center justify-between">
               <div className="text-sm text-white/50">
-                Selected for compare:{" "}
+                Selected for actions:{" "}
                 <span className="text-white/80 font-medium">
                   {selectedScheduleIds.length}
                 </span>{" "}
-                (need 2+)
+                (share 1+, compare 2+)
               </div>
               
               <div className="flex items-center gap-3">
@@ -248,10 +282,17 @@ export default function FitnessTrackerPage() {
                   const isSelected = selectedScheduleIds.includes(schedule.id);
 
                   return (
-                    <button
+                    <article
                       key={schedule.id}
-                      type="button"
+                      role="button"
+                      tabIndex={0}
                       onClick={() => handleOpenSchedule(schedule)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          handleOpenSchedule(schedule);
+                        }
+                      }}
                       className={`group relative flex h-[320px] w-[280px] shrink-0 flex-col rounded-2xl border bg-white/10 p-5 text-left shadow-[0_12px_30px_rgba(0,0,0,0.25)] transition-all duration-300 hover:-translate-y-1 hover:bg-white/15
                         ${
                           isSelected
@@ -318,7 +359,7 @@ export default function FitnessTrackerPage() {
                       <div className="absolute bottom-0 right-0 h-10 w-10 overflow-hidden">
                         <div className="absolute bottom-0 right-0 h-10 w-10 border-l border-t border-white/10 bg-white/10 [clip-path:polygon(100%_0,0_100%,100%_100%)]" />
                       </div>
-                    </button>
+                    </article>
                   );
                 })
               ) : (
@@ -337,6 +378,12 @@ export default function FitnessTrackerPage() {
           </div>
         </div>
       </div>
+
+      <ShareSchedulesModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        schedules={selectedSchedulePreviews}
+      />
     </div>
   );
 }
