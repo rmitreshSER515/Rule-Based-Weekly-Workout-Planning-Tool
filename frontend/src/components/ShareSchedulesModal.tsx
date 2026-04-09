@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { fetchUsers, type UserSummary } from "../api/users";
+import { createNotification } from "../api/notifications";
 
 export type ShareableScheduleSummary = {
   id: string;
@@ -15,25 +16,6 @@ interface ShareSchedulesModalProps {
   onClose: () => void;
   schedules: ShareableScheduleSummary[];
 }
-
-const formatDateRange = (
-  startDate?: string,
-  endDate?: string,
-): string => {
-  if (startDate && endDate) {
-    return `${startDate} to ${endDate}`;
-  }
-
-  if (startDate) {
-    return `Starts ${startDate}`;
-  }
-
-  if (endDate) {
-    return `Ends ${endDate}`;
-  }
-
-  return "No date range selected";
-};
 
 export default function ShareSchedulesModal({
   isOpen,
@@ -55,8 +37,30 @@ export default function ShareSchedulesModal({
   };
 
   const handleSend = () => {
-    // Placeholder for wiring share API
-    onClose();
+    const stored = localStorage.getItem("user");
+    const senderId = stored ? (JSON.parse(stored)?.id ?? JSON.parse(stored)?._id) : null;
+    if (!senderId) {
+      onClose();
+      return;
+    }
+    const notifications = [];
+    for (const schedule of schedules) {
+      for (const userId of selectedUserIds) {
+        notifications.push(
+          createNotification({
+            userId,
+            fromUserId: senderId,
+            scheduleId: schedule.id,
+            message: `Schedule shared: ${schedule.title || "Untitled Schedule"}`,
+          })
+        );
+      }
+    }
+    Promise.all(notifications)
+      .catch((err) => {
+        console.error("Failed to send notifications", err);
+      })
+      .finally(() => onClose());
   };
 
   useEffect(() => {

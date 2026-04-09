@@ -12,6 +12,7 @@ import { SchedulesModule } from './schedules/schedules.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 
 @Module({
@@ -32,6 +33,7 @@ import { AuthModule } from './auth/auth.module';
     MetricsModule,
     UsersModule,
     AuthModule,
+    NotificationsModule,
 
     
   ],
