@@ -5,6 +5,7 @@ import { NotificationsController } from './notifications.controller';
 import { NotificationsService } from './notifications.service';
 import { SchedulesModule } from '../schedules/schedules.module';
 import { ExercisesModule } from '../exercises/exercises.module';
+import { RulesModule } from '../rules/rules.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { ExercisesModule } from '../exercises/exercises.module';
     ]),
     SchedulesModule,
     ExercisesModule,
+    RulesModule,
   ],
   controllers: [NotificationsController],
   providers: [NotificationsService],
