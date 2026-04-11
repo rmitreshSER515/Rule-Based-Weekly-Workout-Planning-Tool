@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -7,7 +7,6 @@ export default function ForgotPasswordPage() {
   const [touched, setTouched] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [sent, setSent] = useState(false);
-  const navigate = useNavigate();
 
   const validateEmail = (value: string) => {
     if (!value.trim()) return "Email address is required";
