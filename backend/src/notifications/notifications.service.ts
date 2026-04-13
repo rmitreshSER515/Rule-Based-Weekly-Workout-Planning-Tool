@@ -8,6 +8,7 @@ import {
 } from './entities/notification.schema';
 import { SchedulesService } from '../schedules/schedules.service';
 import { ExercisesService } from '../exercises/exercises.service';
+import { RulesService } from '../rules/rules.service';
 
 type CreateNotificationInput = {
   userId: string;
@@ -23,6 +24,7 @@ export class NotificationsService {
     private readonly notificationModel: Model<NotificationDocument>,
     private readonly schedulesService: SchedulesService,
     private readonly exercisesService: ExercisesService,
+    private readonly rulesService: RulesService,
   ) {}
 
   async create(input: CreateNotificationInput) {
@@ -106,12 +108,21 @@ export class NotificationsService {
       }));
     }
 
+    // Import rules referenced by the shared schedule
+    const sourceRuleIds = schedule.selectedRuleIds ?? [];
+    const sourceRules = await this.rulesService.findByIds(sourceRuleIds);
+    const importedRules = await this.rulesService.ensureRulesForUser(
+      userId,
+      sourceRules,
+    );
+    const newRuleIds = importedRules.map((r) => r._id.toString());
+
     await this.schedulesService.create({
       userId,
       title: `${schedule.title} (shared)`,
       startDate: schedule.startDate,
       endDate: schedule.endDate,
-      selectedRuleIds: [],
+      selectedRuleIds: newRuleIds,
       calendarExercises: remappedCalendar,
     });
 
