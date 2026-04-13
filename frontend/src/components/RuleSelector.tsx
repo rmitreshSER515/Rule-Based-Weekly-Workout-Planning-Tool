@@ -139,7 +139,7 @@ export default function RuleSelector({ isOpen, onClose, onApplyRules, exercises,
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {rules.map((rule, index) => (
+                    {rules.map((rule) => (
                       <div
                         key={rule.id}
                         className="flex items-center gap-4 p-4 rounded-lg bg-white/5 border border-white/10 hover:bg-white/8 transition-colors cursor-pointer"
