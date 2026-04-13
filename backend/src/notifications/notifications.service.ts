@@ -6,6 +6,8 @@ import {
   NotificationDocument,
   NotificationStatus,
 } from './entities/notification.schema';
+import { SchedulesService } from '../schedules/schedules.service';
+import { ExercisesService } from '../exercises/exercises.service';
 
 type CreateNotificationInput = {
   userId: string;
@@ -19,6 +21,8 @@ export class NotificationsService {
   constructor(
     @InjectModel(Notification.name)
     private readonly notificationModel: Model<NotificationDocument>,
+    private readonly schedulesService: SchedulesService,
+    private readonly exercisesService: ExercisesService,
   ) {}
 
   async create(input: CreateNotificationInput) {
@@ -59,6 +63,59 @@ export class NotificationsService {
       throw new ForbiddenException('Cannot update another user notification');
     }
     existing.set({ status });
+    return existing.save();
+  }
+
+  async acceptScheduleShare(id: string, userId: string) {
+    if (!isValidObjectId(id)) {
+      throw new NotFoundException('Notification not found');
+    }
+    const existing = await this.notificationModel.findById(id).exec();
+    if (!existing) {
+      throw new NotFoundException('Notification not found');
+    }
+    if (existing.userId !== userId) {
+      throw new ForbiddenException('Cannot update another user notification');
+    }
+    if (existing.status === 'accepted') {
+      return existing;
+    }
+
+    const schedule = await this.schedulesService.findById(existing.scheduleId);
+    if (!schedule) {
+      throw new NotFoundException('Schedule not found');
+    }
+
+    const calendarExercises = schedule.calendarExercises ?? {};
+    const exerciseNames = Object.values(calendarExercises).flatMap((items) =>
+      items.map((item) => item.name).filter(Boolean),
+    );
+    const ensured = await this.exercisesService.ensureExercisesForUser(
+      userId,
+      exerciseNames,
+    );
+    const nameToId = new Map(
+      ensured.map((ex) => [ex.name.trim().toLowerCase(), ex._id.toString()]),
+    );
+
+    const remappedCalendar: typeof calendarExercises = {};
+    for (const [dateKey, items] of Object.entries(calendarExercises)) {
+      remappedCalendar[dateKey] = items.map((item) => ({
+        ...item,
+        exerciseId: nameToId.get(item.name.trim().toLowerCase()) ?? '',
+      }));
+    }
+
+    await this.schedulesService.create({
+      userId,
+      title: `${schedule.title} (shared)`,
+      startDate: schedule.startDate,
+      endDate: schedule.endDate,
+      selectedRuleIds: [],
+      calendarExercises: remappedCalendar,
+    });
+
+    existing.set({ status: 'accepted' });
     return existing.save();
   }
 }

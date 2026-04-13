@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Patch, Post, Query, Param } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
-import { NotificationStatus } from './entities/notification.schema';
+import type { NotificationStatus } from './entities/notification.schema';
 
 @Controller('notifications')
 export class NotificationsController {
@@ -55,11 +55,14 @@ export class NotificationsController {
     @Param('id') id: string,
     @Body() body: { userId: string; status: NotificationStatus },
   ) {
-    const updated = await this.notificationsService.updateStatus(
-      id,
-      body.userId,
-      body.status,
-    );
+    const updated =
+      body.status === 'accepted'
+        ? await this.notificationsService.acceptScheduleShare(id, body.userId)
+        : await this.notificationsService.updateStatus(
+            id,
+            body.userId,
+            body.status,
+          );
     return {
       id: updated._id.toString(),
       userId: updated.userId,

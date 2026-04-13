@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createNotification } from "../api/notifications";
 import { fetchUsers, type UserSummary } from "../api/users";
+import { createNotification } from "../api/notifications";
 
 export type ShareableScheduleSummary = {
   id: string;

@@ -76,4 +76,19 @@ export class SchedulesService implements OnModuleInit {
     }
     return this.scheduleModel.findById(id).exec();
   }
+
+  async delete(id: string, userId: string): Promise<ScheduleDocument> {
+    if (!isValidObjectId(id)) {
+      throw new NotFoundException('Schedule not found');
+    }
+    const existing = await this.scheduleModel.findById(id).exec();
+    if (!existing) {
+      throw new NotFoundException('Schedule not found');
+    }
+    if (existing.userId !== userId) {
+      throw new ForbiddenException('Cannot delete another user schedule');
+    }
+    await this.scheduleModel.deleteOne({ _id: id }).exec();
+    return existing;
+  }
 }
