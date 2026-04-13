@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { fetchUsers, type UserSummary } from "../api/users";
 
 export type ShareableScheduleSummary = {
   id: string;
@@ -15,30 +16,30 @@ interface ShareSchedulesModalProps {
   schedules: ShareableScheduleSummary[];
 }
 
-const formatDateRange = (
-  startDate?: string,
-  endDate?: string,
-): string => {
-  if (startDate && endDate) {
-    return `${startDate} to ${endDate}`;
-  }
-
-  if (startDate) {
-    return `Starts ${startDate}`;
-  }
-
-  if (endDate) {
-    return `Ends ${endDate}`;
-  }
-
-  return "No date range selected";
-};
-
 export default function ShareSchedulesModal({
   isOpen,
   onClose,
   schedules,
 }: ShareSchedulesModalProps) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [users, setUsers] = useState<UserSummary[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [usersError, setUsersError] = useState("");
+
+  const filteredUsers = useMemo(() => users, [users]);
+
+  const toggleUserSelection = (id: string) => {
+    setSelectedUserIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleSend = () => {
+    // Placeholder for wiring share API
+    onClose();
+  };
+
   useEffect(() => {
     if (!isOpen) return;
 
@@ -52,13 +53,46 @@ export default function ShareSchedulesModal({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    setSearchQuery("");
+    setSelectedUserIds([]);
+    setUsers([]);
+    setUsersError("");
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+
+    const load = async () => {
+      setLoadingUsers(true);
+      setUsersError("");
+      try {
+        const data = await fetchUsers(searchQuery);
+        if (!cancelled) setUsers(data);
+      } catch (err) {
+        console.error("Failed to load users", err);
+        if (!cancelled) setUsersError("Failed to load users");
+      } finally {
+        if (!cancelled) setLoadingUsers(false);
+      }
+    };
+
+    const timer = window.setTimeout(load, 250);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [isOpen, searchQuery]);
+
   if (!isOpen) return null;
 
   const heading = schedules.length === 1 ? "Share Schedule" : "Share Schedules";
   const summary =
     schedules.length === 1
-      ? "Preview the schedule details that will be included when sharing is wired up."
-      : `Previewing ${schedules.length} selected schedules for the future share flow.`;
+      ? "Select one or more users to share this schedule."
+      : `Select users to share ${schedules.length} schedules.`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -124,55 +158,72 @@ export default function ShareSchedulesModal({
               </button>
             </div>
 
-            <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {schedules.map((schedule) => (
-                <article
-                  key={schedule.id}
-                  className="rounded-2xl border border-white/12 bg-white/6 p-5 shadow-[0_12px_30px_rgba(0,0,0,0.22)] backdrop-blur-xl"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-medium text-cyan-100">
-                      Schedule
-                    </span>
-                    <span className="text-xs text-white/35">{schedule.id}</span>
-                  </div>
+            <div className="mt-8 space-y-4">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search users by name..."
+                  className="w-full rounded-xl border border-white/15 bg-white/10 px-4 py-3 pr-12 text-sm text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-cyan-400/40 focus:border-cyan-400/40"
+                />
+                <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-white/50">
+                  <svg
+                    className="h-5 w-5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                </span>
+              </div>
 
-                  <h3 className="mt-4 line-clamp-2 text-xl font-bold text-white">
-                    {schedule.title || "Untitled Schedule"}
-                  </h3>
-
-                  <dl className="mt-5 space-y-3 text-sm text-white/75">
-                    <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5">
-                      <dt className="text-xs uppercase tracking-[0.2em] text-white/40">
-                        Date Range
-                      </dt>
-                      <dd className="mt-1 font-medium text-white">
-                        {formatDateRange(schedule.startDate, schedule.endDate)}
-                      </dd>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5">
-                        <dt className="text-xs uppercase tracking-[0.2em] text-white/40">
-                          Exercises
-                        </dt>
-                        <dd className="mt-1 text-lg font-semibold text-white">
-                          {schedule.exerciseCount ?? 0}
-                        </dd>
-                      </div>
-
-                      <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5">
-                        <dt className="text-xs uppercase tracking-[0.2em] text-white/40">
-                          Rules
-                        </dt>
-                        <dd className="mt-1 text-lg font-semibold text-white">
-                          {schedule.selectedRuleCount ?? 0}
-                        </dd>
-                      </div>
-                    </div>
-                  </dl>
-                </article>
-              ))}
+              <div className="max-h-72 overflow-y-auto rounded-2xl border border-white/12 bg-white/5 p-3">
+                {loadingUsers ? (
+                  <p className="text-sm text-white/50 px-2 py-3">
+                    Loading users...
+                  </p>
+                ) : usersError ? (
+                  <p className="text-sm text-red-300/80 px-2 py-3">
+                    {usersError}
+                  </p>
+                ) : filteredUsers.length === 0 ? (
+                  <p className="text-sm text-white/50 px-2 py-3">
+                    No users found.
+                  </p>
+                ) : (
+                  <ul className="space-y-2">
+                    {filteredUsers.map((user) => {
+                      const name = `${user.firstName} ${user.lastName}`.trim();
+                      const checked = selectedUserIds.includes(user.id);
+                      return (
+                        <li
+                          key={user.id}
+                          className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleUserSelection(user.id)}
+                            className="h-4 w-4 rounded border-white/30 bg-white/10 accent-cyan-500"
+                          />
+                          <span className="text-sm text-white/80">
+                            {name || user.email}
+                          </span>
+                          <span className="ml-auto text-xs text-white/40">
+                            {user.email}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
             </div>
 
             <div className="mt-8 flex items-center justify-end gap-3">
@@ -181,7 +232,15 @@ export default function ShareSchedulesModal({
                 onClick={onClose}
                 className="rounded-xl border border-white/20 bg-white/5 px-4 py-2.5 text-sm font-medium text-white/90 transition-colors hover:bg-white/10 hover:text-white"
               >
-                Close
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSend}
+                disabled={selectedUserIds.length === 0}
+                className="rounded-xl bg-gradient-to-r from-cyan-500 via-sky-500 to-blue-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-cyan-500/30 transition-all hover:shadow-cyan-500/45 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Send
               </button>
             </div>
           </div>
