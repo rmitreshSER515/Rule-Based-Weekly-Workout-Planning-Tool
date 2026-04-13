@@ -2,6 +2,11 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { logout } from "../utils/auth";
 import { fetchSchedules } from "../api/schedules";
+import {
+  fetchNotifications,
+  updateNotificationStatus,
+  type NotificationDto,
+} from "../api/notifications";
 import ShareSchedulesModal, {
   type ShareableScheduleSummary,
 } from "./ShareSchedulesModal";
@@ -20,10 +25,15 @@ export default function FitnessTrackerPage() {
   const [schedules, setSchedules] = useState<ScheduleCard[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationDto[]>([]);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
   const [selectedScheduleIds, setSelectedScheduleIds] = useState<string[]>([]);
   const canCompare = selectedScheduleIds.length >= 2;
   const canShare = selectedScheduleIds.length >= 1;
+  const hasPendingNotifications = notifications.some(
+    (n) => n.status === "pending"
+  );
 
   
   const [searchQuery, setSearchQuery] = useState("");
@@ -75,11 +85,43 @@ export default function FitnessTrackerPage() {
   }, [userId]);
 
   useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    fetchNotifications(userId)
+      .then((items) => {
+        if (!cancelled) setNotifications(items);
+      })
+      .catch(() => {
+        if (!cancelled) setNotifications([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  useEffect(() => {
     const ids = new Set(schedules.map((s) => s.id));
     setSelectedScheduleIds((prev) => prev.filter((id) => ids.has(id)));
   }, [schedules]);
 
   const handleLogout = () => logout(navigate);
+  const handleNotificationAction = async (
+    notificationId: string,
+    status: "accepted" | "declined"
+  ) => {
+    if (!userId) return;
+    try {
+      const updated = await updateNotificationStatus(notificationId, {
+        userId,
+        status,
+      });
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === updated.id ? updated : n))
+      );
+    } catch (err) {
+      console.error("Failed to update notification", err);
+    }
+  };
 
   const handleCreateSchedule = () => {
     navigate("/schedules", { state: { mode: "create" } });
@@ -147,6 +189,95 @@ export default function FitnessTrackerPage() {
               </div>
 
               <div className="absolute right-6 top-8 flex items-center gap-3">
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setIsNotificationsOpen((prev) => !prev)
+                    }
+                    className="relative rounded-xl border border-white/20 bg-white/5 p-2.5 text-white/80 hover:bg-white/10 transition-colors"
+                    aria-label="Notifications"
+                  >
+                    <svg
+                      className="h-5 w-5"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+                      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                    </svg>
+                    {hasPendingNotifications && (
+                      <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-slate-950" />
+                    )}
+                  </button>
+
+                  {isNotificationsOpen && (
+                    <div className="absolute right-0 mt-3 w-80 max-h-96 overflow-y-auto rounded-2xl border border-white/15 bg-slate-900/95 backdrop-blur-xl shadow-2xl z-50">
+                      <div className="px-4 py-3 border-b border-white/10 text-sm font-semibold text-white/80">
+                        Notifications
+                      </div>
+                      {notifications.length === 0 ? (
+                        <div className="px-4 py-6 text-sm text-white/50">
+                          No notifications yet.
+                        </div>
+                      ) : (
+                        <div className="p-3 space-y-3">
+                          {notifications.map((n) => (
+                            <div
+                              key={n.id}
+                              className="rounded-xl border border-white/10 bg-white/5 px-3 py-3"
+                            >
+                              <p className="text-sm text-white/80">
+                                {n.message}
+                              </p>
+                              <div className="mt-2 flex items-center justify-end gap-2">
+                                {n.status === "pending" ? (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleNotificationAction(
+                                          n.id,
+                                          "declined"
+                                        )
+                                      }
+                                      className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white/70 hover:bg-white/10"
+                                    >
+                                      Cancel
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleNotificationAction(
+                                          n.id,
+                                          "accepted"
+                                        )
+                                      }
+                                      className="rounded-lg bg-emerald-500/20 border border-emerald-400/30 px-3 py-1.5 text-xs font-semibold text-emerald-200 hover:bg-emerald-500/30"
+                                    >
+                                      Accept
+                                    </button>
+                                  </>
+                                ) : (
+                                  <span className="text-xs text-white/40">
+                                    {n.status === "accepted"
+                                      ? "Accepted"
+                                      : "Declined"}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 <button
                   type="button"
                   disabled={!canShare}

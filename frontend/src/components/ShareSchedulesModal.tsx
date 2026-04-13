@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { createNotification } from "../api/notifications";
 import { fetchUsers, type UserSummary } from "../api/users";
 
 export type ShareableScheduleSummary = {
@@ -36,8 +37,30 @@ export default function ShareSchedulesModal({
   };
 
   const handleSend = () => {
-    // Placeholder for wiring share API
-    onClose();
+    const stored = localStorage.getItem("user");
+    const senderId = stored ? (JSON.parse(stored)?.id ?? JSON.parse(stored)?._id) : null;
+    if (!senderId) {
+      onClose();
+      return;
+    }
+    const notifications = [];
+    for (const schedule of schedules) {
+      for (const userId of selectedUserIds) {
+        notifications.push(
+          createNotification({
+            userId,
+            fromUserId: senderId,
+            scheduleId: schedule.id,
+            message: `Schedule shared: ${schedule.title || "Untitled Schedule"}`,
+          })
+        );
+      }
+    }
+    Promise.all(notifications)
+      .catch((err) => {
+        console.error("Failed to send notifications", err);
+      })
+      .finally(() => onClose());
   };
 
   useEffect(() => {
