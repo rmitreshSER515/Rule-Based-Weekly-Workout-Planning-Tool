@@ -1490,9 +1490,16 @@ const confirmDeleteExercise = useCallback(async () => {
                       <button
                         type="button"
                         onClick={() => {
-                          setIsScheduleDropdownOpen(false);
-                          navigate("/fitness", { state: { openCreate: true } });
-                        }}
+  setIsScheduleDropdownOpen(false);
+  setScheduleId(null);
+  setScheduleTitle("");
+  setTitleDraft("");
+  setIsEditingTitle(true);
+  setSelectedRuleIds([]);
+  setCalendarExercises({});
+  setLastSavedSnapshot("");
+  setScheduleLoaded(true);
+}}
                         className="w-full flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-white/50 hover:text-white hover:bg-white/[0.08] transition-colors"
                       >
                         <svg
