@@ -224,17 +224,17 @@ export default function FitnessTrackerPage() {
       <div className="relative z-10 min-h-screen px-6 py-8">
         <div className="mx-auto max-w-7xl">
           <div className="mb-8 border-b border-white/15 pb-6">
-            <div className="flex items-center justify-between gap-4">
-              <div className="w-full text-center">
+            <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
+              <div className="w-full xl:flex-1 xl:pr-6">
                 <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-wide text-white drop-shadow">
                   Workout Planner
                 </h1>
-                <p className="mt-3 text-sm sm:text-base text-white/65">
+                <p className="mt-3 text-sm sm:text-base text-white/65 xl:max-w-xl">
                   Create, view, and compare your schedules
                 </p>
               </div>
 
-              <div className="absolute right-6 top-8 flex items-center gap-3">
+              <div className="flex flex-wrap items-center justify-start gap-3 xl:max-w-[48rem] xl:justify-end">
                 <div className="relative">
                   <button
                     type="button"

@@ -122,7 +122,7 @@ export default function LoginPage() {
         <div className="rounded-2xl border border-white/15 bg-white/10 backdrop-blur-xl shadow-[0_18px_60px_rgba(0,0,0,0.45)]">
           <div className="pt-8 px-8 text-center">
             <h1 className="text-4xl font-extrabold tracking-wide text-white drop-shadow">
-              Fitness Tracker
+              Workout Planner
             </h1>
             <p className="mt-2 text-white/70 text-sm">
               Sign in to plan your workouts

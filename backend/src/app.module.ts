@@ -19,7 +19,7 @@ import { NotificationsModule } from './notifications/notifications.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: join(__dirname, '..', '.env'),
+      envFilePath: [join(process.cwd(), '.env'), join(__dirname, '..', '.env')],
     }),
 
     MongooseModule.forRoot(
