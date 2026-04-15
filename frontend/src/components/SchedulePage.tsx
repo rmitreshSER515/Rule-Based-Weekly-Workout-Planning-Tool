@@ -542,6 +542,7 @@ export default function SchedulePage() {
       setCalendarExercises({});
       setLastSavedSnapshot("");
       setScheduleLoaded(true);
+      navigate("/fitness");
     } catch (err) {
       console.error("Failed to delete schedule", err);
     }

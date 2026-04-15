@@ -19,6 +19,7 @@ export default function RegisterPage() {
   const [showConfirm, setShowConfirm] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
   const [touched, setTouched] = useState({
     firstName: false,
@@ -178,6 +179,7 @@ export default function RegisterPage() {
       password: true,
       confirm: true,
     });
+    setSubmitError("");
   
     if (!validateAll()) return;
   
@@ -212,10 +214,7 @@ export default function RegisterPage() {
   
       navigate("/login");
     } catch (error: any) {
-      setErrors((prev) => ({
-        ...prev,
-        email: error.message,
-      }));
+      setSubmitError(error.message || "Registration failed");
     } finally {
       setIsLoading(false);
     }
@@ -263,7 +262,10 @@ export default function RegisterPage() {
             <div>
               <input
                 value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
+                onChange={(e) => {
+                  setFirstName(e.target.value);
+                  setSubmitError("");
+                }}
                 onBlur={() => setTouched((p) => ({ ...p, firstName: true }))}
                 placeholder="First Name"
                 className={`w-full rounded-full bg-white/10 text-white placeholder-white/60 px-5 py-3.5 outline-none border ${
@@ -279,7 +281,10 @@ export default function RegisterPage() {
             <div>
               <input
                 value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
+                onChange={(e) => {
+                  setLastName(e.target.value);
+                  setSubmitError("");
+                }}
                 onBlur={() => setTouched((p) => ({ ...p, lastName: true }))}
                 placeholder="Last Name"
                 className={`w-full rounded-full bg-white/10 text-white placeholder-white/60 px-5 py-3.5 outline-none border ${
@@ -320,9 +325,9 @@ export default function RegisterPage() {
                 <input
                   value={phone}
                   onChange={(e) => {
-                    
                     const digits = digitsOnlyPhone(e.target.value).slice(0, PHONE_DIGITS);
                     setPhone(digits);
+                    setSubmitError("");
                   }}
                   onBlur={() => setTouched((p) => ({ ...p, phone: true }))}
                   placeholder="Phone Number"
@@ -343,7 +348,10 @@ export default function RegisterPage() {
             <div>
               <input
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setSubmitError("");
+                }}
                 onBlur={() => setTouched((p) => ({ ...p, email: true }))}
                 placeholder="Email Address"
                 className={`w-full rounded-full bg-white/10 text-white placeholder-white/60 px-5 py-3.5 outline-none border ${
@@ -361,7 +369,10 @@ export default function RegisterPage() {
                 <input
                   type={showPassword ? "text" : "password"}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    setSubmitError("");
+                  }}
                   onBlur={() => setTouched((p) => ({ ...p, password: true }))}
                   placeholder="Password"
                   className={`w-full rounded-full bg-white/10 text-white placeholder-white/60 px-5 py-3.5 pr-12 outline-none border ${
@@ -456,7 +467,10 @@ export default function RegisterPage() {
                 <input
                   type={showConfirm ? "text" : "password"}
                   value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  onChange={(e) => {
+                    setConfirmPassword(e.target.value);
+                    setSubmitError("");
+                  }}
                   onBlur={() => setTouched((p) => ({ ...p, confirm: true }))}
                   placeholder="Confirm Password"
                   className={`w-full rounded-full bg-white/10 text-white placeholder-white/60 px-5 py-3.5 pr-12 outline-none border ${
@@ -498,6 +512,10 @@ export default function RegisterPage() {
                 <p className="text-red-400 text-xs mt-1.5 ml-5">{errors.confirm}</p>
               )}
             </div>
+
+            {submitError && (
+              <p className="text-red-400 text-xs ml-5">{submitError}</p>
+            )}
 
             <button
               type="submit"
