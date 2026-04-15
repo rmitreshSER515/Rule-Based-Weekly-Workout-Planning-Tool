@@ -8,6 +8,14 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
 
+function requireJwtSecret(config: ConfigService): string {
+  const secret = config.get<string>('JWT_SECRET');
+  if (!secret || secret.trim().length === 0) {
+    throw new Error('Missing required env var JWT_SECRET');
+  }
+  return secret;
+}
+
 @Module({
   imports: [
     UsersModule,
@@ -16,7 +24,7 @@ import { JwtStrategy } from './jwt.strategy';
       imports: [ConfigModule],
       inject: [ConfigService],
      useFactory: (config: ConfigService) => {
-  const secret = config.get<string>('JWT_SECRET') ?? 'dev_secret_change_me';
+  const secret = requireJwtSecret(config);
   const expiresIn = (config.get<string>('JWT_EXPIRES_IN') ?? '1d') as StringValue;
 
   return {
