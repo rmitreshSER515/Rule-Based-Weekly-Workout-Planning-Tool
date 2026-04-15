@@ -10,6 +10,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
+  const [submitError, setSubmitError] = useState("");
   const [touched, setTouched] = useState({ email: false, password: false });
   const navigate = useNavigate();
 
@@ -36,6 +37,7 @@ export default function LoginPage() {
 
     setEmailError("");
     setPasswordError("");
+    setSubmitError("");
 
     let hasError = false;
 
@@ -88,7 +90,7 @@ export default function LoginPage() {
       navigate("/fitness");
     } catch (err: any) {
       const msg = err?.message || "Login failed";
-      setPasswordError(msg);
+      setSubmitError(msg);
     } finally {
       setIsLoading(false);
     }
@@ -134,6 +136,7 @@ export default function LoginPage() {
                 value={emailOrUser}
                 onChange={(e) => {
                   setEmailOrUser(e.target.value);
+                  setSubmitError("");
                 }}
                 onBlur={() => setTouched((prev) => ({ ...prev, email: true }))}
                 placeholder="Email Address"
@@ -168,6 +171,7 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => {
                     setPassword(e.target.value);
+                    setSubmitError("");
                   }}
                   onBlur={() => setTouched((prev) => ({ ...prev, password: true }))}
                   placeholder="Password"
@@ -212,6 +216,9 @@ export default function LoginPage() {
               
               {passwordError && (
                 <p className="text-red-400 text-xs mt-1.5 ml-5">{passwordError}</p>
+              )}
+              {!passwordError && submitError && (
+                <p className="text-red-400 text-xs mt-1.5 ml-5">{submitError}</p>
               )}
             </div>
 
