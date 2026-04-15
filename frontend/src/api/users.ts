@@ -26,3 +26,46 @@ export async function fetchUsers(search: string): Promise<UserSummary[]> {
 
   return (await res.json()) as UserSummary[];
 }
+
+export async function fetchFriends(userId: string): Promise<UserSummary[]> {
+  const res = await fetch(`${API_URL}/users/${userId}/friends`, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+  });
+
+  const data = await res.json().catch(() => []);
+  if (!res.ok) {
+    throw new Error(data?.message ?? "Failed to load friends");
+  }
+
+  return Array.isArray(data) ? (data as UserSummary[]) : [];
+}
+
+export async function sendFriendRequestByEmail(userId: string, email: string) {
+  const res = await fetch(`${API_URL}/users/friends/request`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId, email: email.trim().toLowerCase() }),
+  });
+
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new Error(data?.message ?? "Failed to send friend request");
+  }
+
+  return data;
+}
+
+export async function deleteFriend(userId: string, friendId: string) {
+  const res = await fetch(`${API_URL}/users/${userId}/friends/${friendId}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+  });
+
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new Error(data?.message ?? "Failed to remove friend");
+  }
+
+  return data;
+}

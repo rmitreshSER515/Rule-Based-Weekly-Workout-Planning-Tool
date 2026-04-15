@@ -10,6 +10,7 @@ import {
 import ShareSchedulesModal, {
   type ShareableScheduleSummary,
 } from "./ShareSchedulesModal";
+import FriendsModal from "./FriendsModal";
 
 type ScheduleCard = {
   id: string;
@@ -25,6 +26,8 @@ export default function FitnessTrackerPage() {
   const [schedules, setSchedules] = useState<ScheduleCard[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isFriendsModalOpen, setIsFriendsModalOpen] = useState(false);
+  const [shareSuccessMessage, setShareSuccessMessage] = useState("");
   const [notifications, setNotifications] = useState<NotificationDto[]>([]);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [confirmDeleteSchedule, setConfirmDeleteSchedule] = useState<{
@@ -161,6 +164,15 @@ export default function FitnessTrackerPage() {
     navigate("/schedules", { state: { mode: "create" } });
   };
 
+  const handleShareSuccess = () => {
+    setShareSuccessMessage(
+      selectedScheduleIds.length > 1
+        ? "Schedules shared successfully"
+        : "Schedule shared successfully",
+    );
+    window.setTimeout(() => setShareSuccessMessage(""), 2500);
+  };
+
   const handleOpenSchedule = (schedule: ScheduleCard) => {
     navigate("/schedules", {
       state: {
@@ -281,7 +293,7 @@ export default function FitnessTrackerPage() {
                                       }
                                       className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white/70 hover:bg-white/10"
                                     >
-                                      Cancel
+                                      Decline
                                     </button>
                                     <button
                                       type="button"
@@ -311,6 +323,14 @@ export default function FitnessTrackerPage() {
                     </div>
                   )}
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsFriendsModalOpen(true)}
+                  className="rounded-xl border border-violet-400/30 bg-violet-400/10 px-5 py-2.5 text-sm font-semibold text-violet-100 backdrop-blur-xl transition-all hover:bg-violet-400/15 hover:text-white"
+                >
+                  Friends
+                </button>
 
                 <button
                   type="button"
@@ -379,12 +399,22 @@ export default function FitnessTrackerPage() {
 
           <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
             <div className="mb-6 flex items-center justify-between">
-              <div className="text-sm text-white/50">
-                Selected for actions:{" "}
-                <span className="text-white/80 font-medium">
-                  {selectedScheduleIds.length}
-                </span>{" "}
-                (share 1+, compare 2+)
+              <div className="flex items-center gap-3 text-sm text-white/50">
+                <span>
+                  Selected for actions:{" "}
+                  <span className="text-white/80 font-medium">
+                    {selectedScheduleIds.length}
+                  </span>{" "}
+                  (share 1+, compare 2+)
+                </span>
+                {shareSuccessMessage ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 border border-emerald-400/30 px-3 py-1.5 text-xs font-medium text-emerald-300">
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    {shareSuccessMessage}
+                  </span>
+                ) : null}
               </div>
               
               <div className="flex items-center gap-3">
@@ -588,7 +618,17 @@ export default function FitnessTrackerPage() {
       <ShareSchedulesModal
         isOpen={isShareModalOpen}
         onClose={() => setIsShareModalOpen(false)}
+        onManageFriends={() => {
+          setIsShareModalOpen(false);
+          setIsFriendsModalOpen(true);
+        }}
+        onShared={handleShareSuccess}
         schedules={selectedSchedulePreviews}
+      />
+
+      <FriendsModal
+        isOpen={isFriendsModalOpen}
+        onClose={() => setIsFriendsModalOpen(false)}
       />
 
       {confirmDeleteSchedule && (

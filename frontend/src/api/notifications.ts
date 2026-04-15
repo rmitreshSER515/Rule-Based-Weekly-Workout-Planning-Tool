@@ -1,13 +1,13 @@
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
 export type NotificationStatus = "pending" | "accepted" | "declined";
-export type NotificationType = "schedule_share";
+export type NotificationType = "schedule_share" | "friend_request";
 
 export type NotificationDto = {
   id: string;
   userId: string;
   fromUserId: string;
-  scheduleId: string;
+  scheduleId?: string;
   message: string;
   status: NotificationStatus;
   type: NotificationType;
@@ -38,8 +38,9 @@ export async function fetchNotifications(
 export async function createNotification(input: {
   userId: string;
   fromUserId: string;
-  scheduleId: string;
+  scheduleId?: string;
   message: string;
+  type?: NotificationType;
 }): Promise<NotificationDto> {
   const res = await fetch(`${API_URL}/notifications`, {
     method: "POST",
