@@ -215,7 +215,7 @@ export default function FitnessTrackerPage() {
             <div className="flex items-center justify-between gap-4">
               <div className="w-full text-center">
                 <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-wide text-white drop-shadow">
-                  Fitness Page
+                  Workout Planner
                 </h1>
                 <p className="mt-3 text-sm sm:text-base text-white/65">
                   Create, view, and compare your schedules
