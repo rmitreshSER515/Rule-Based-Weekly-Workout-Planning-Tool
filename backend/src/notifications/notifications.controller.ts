@@ -1,6 +1,9 @@
 import { Body, Controller, Get, Patch, Post, Query, Param } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
-import type { NotificationStatus } from './entities/notification.schema';
+import type {
+  NotificationStatus,
+  NotificationType,
+} from './entities/notification.schema';
 
 @Controller('notifications')
 export class NotificationsController {
@@ -32,8 +35,9 @@ export class NotificationsController {
     body: {
       userId: string;
       fromUserId: string;
-      scheduleId: string;
+      scheduleId?: string;
       message: string;
+      type?: NotificationType;
     },
   ) {
     const created = await this.notificationsService.create(body);
@@ -55,14 +59,11 @@ export class NotificationsController {
     @Param('id') id: string,
     @Body() body: { userId: string; status: NotificationStatus },
   ) {
-    const updated =
-      body.status === 'accepted'
-        ? await this.notificationsService.acceptScheduleShare(id, body.userId)
-        : await this.notificationsService.updateStatus(
-            id,
-            body.userId,
-            body.status,
-          );
+    const updated = await this.notificationsService.updateStatus(
+      id,
+      body.userId,
+      body.status,
+    );
     return {
       id: updated._id.toString(),
       userId: updated.userId,

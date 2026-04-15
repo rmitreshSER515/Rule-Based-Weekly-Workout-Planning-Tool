@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { createNotification } from "../api/notifications";
-import { fetchUsers, type UserSummary } from "../api/users";
+import { fetchFriends, type UserSummary } from "../api/users";
 
 export type ShareableScheduleSummary = {
   id: string;
@@ -15,72 +15,38 @@ interface ShareSchedulesModalProps {
   isOpen: boolean;
   onClose: () => void;
   schedules: ShareableScheduleSummary[];
+  onManageFriends?: () => void;
+  onShared?: () => void;
 }
 
 export default function ShareSchedulesModal({
   isOpen,
   onClose,
   schedules,
+  onManageFriends,
+  onShared,
 }: ShareSchedulesModalProps) {
-  const [searchQuery, setSearchQuery] = useState("");
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
-  const [users, setUsers] = useState<UserSummary[]>([]);
-  const [loadingUsers, setLoadingUsers] = useState(false);
-  const [usersError, setUsersError] = useState("");
+  const [friends, setFriends] = useState<UserSummary[]>([]);
+  const [loadingFriends, setLoadingFriends] = useState(false);
+  const [friendsError, setFriendsError] = useState("");
+  const [isSharing, setIsSharing] = useState(false);
 
-  const currentUserId = useMemo(() => {
-    if (!isOpen) return null;
+  const senderId = useMemo(() => {
     try {
       const stored = localStorage.getItem("user");
       if (!stored) return null;
-      const u = JSON.parse(stored) as { id?: string; _id?: string };
-      const id = u.id ?? u._id;
-      return typeof id === "string" ? id : null;
+      const parsed = JSON.parse(stored);
+      return parsed?.id ?? parsed?._id ?? null;
     } catch {
       return null;
     }
-  }, [isOpen]);
-
-  const filteredUsers = useMemo(
-    () =>
-      currentUserId
-        ? users.filter((u) => u.id !== currentUserId)
-        : users,
-    [users, currentUserId],
-  );
+  }, []);
 
   const toggleUserSelection = (id: string) => {
     setSelectedUserIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
     );
-  };
-
-  const handleSend = () => {
-    const stored = localStorage.getItem("user");
-    const senderId = stored ? (JSON.parse(stored)?.id ?? JSON.parse(stored)?._id) : null;
-    if (!senderId) {
-      onClose();
-      return;
-    }
-    const notifications = [];
-    for (const schedule of schedules) {
-      for (const userId of selectedUserIds) {
-        if (userId === senderId) continue;
-        notifications.push(
-          createNotification({
-            userId,
-            fromUserId: senderId,
-            scheduleId: schedule.id,
-            message: `Schedule shared: ${schedule.title || "Untitled Schedule"}`,
-          })
-        );
-      }
-    }
-    Promise.all(notifications)
-      .catch((err) => {
-        console.error("Failed to send notifications", err);
-      })
-      .finally(() => onClose());
   };
 
   useEffect(() => {
@@ -98,44 +64,90 @@ export default function ShareSchedulesModal({
 
   useEffect(() => {
     if (!isOpen) return;
-    setSearchQuery("");
-    setSelectedUserIds([]);
-    setUsers([]);
-    setUsersError("");
-  }, [isOpen]);
 
-  useEffect(() => {
-    if (!isOpen) return;
+    setSelectedUserIds([]);
+    setFriends([]);
+    setFriendsError("");
+
+    if (!senderId) {
+      setFriendsError("Please sign in again to load your friends.");
+      return;
+    }
+
     let cancelled = false;
 
-    const load = async () => {
-      setLoadingUsers(true);
-      setUsersError("");
+    const loadFriends = async () => {
+      setLoadingFriends(true);
       try {
-        const data = await fetchUsers(searchQuery);
-        if (!cancelled) setUsers(data);
+        const data = await fetchFriends(senderId);
+        if (!cancelled) {
+          setFriends(Array.isArray(data) ? data : []);
+        }
       } catch (err) {
-        console.error("Failed to load users", err);
-        if (!cancelled) setUsersError("Failed to load users");
+        console.error("Failed to load friends", err);
+        if (!cancelled) {
+          setFriendsError("Failed to load friends");
+        }
       } finally {
-        if (!cancelled) setLoadingUsers(false);
+        if (!cancelled) {
+          setLoadingFriends(false);
+        }
       }
     };
 
-    const timer = window.setTimeout(load, 250);
+    void loadFriends();
+
     return () => {
       cancelled = true;
-      window.clearTimeout(timer);
     };
-  }, [isOpen, searchQuery]);
+  }, [isOpen, senderId]);
 
   if (!isOpen) return null;
 
   const heading = schedules.length === 1 ? "Share Schedule" : "Share Schedules";
   const summary =
     schedules.length === 1
-      ? "Select one or more users to share this schedule."
-      : `Select users to share ${schedules.length} schedules.`;
+      ? "Share this schedule with accepted friends only."
+      : `Share ${schedules.length} schedules with accepted friends only.`;
+  const shareButtonLabel = `Share ${schedules.length} schedule${schedules.length === 1 ? "" : "s"}`;
+
+  const handleSend = async () => {
+    if (!senderId) {
+      onClose();
+      return;
+    }
+
+    if (schedules.some((schedule) => !schedule.id || schedule.id === "draft-schedule")) {
+      setFriendsError("Please save the schedule before sharing it.");
+      return;
+    }
+
+    setIsSharing(true);
+    setFriendsError("");
+
+    try {
+      await Promise.all(
+        schedules.flatMap((schedule) =>
+          selectedUserIds.map((userId) =>
+            createNotification({
+              userId,
+              fromUserId: senderId,
+              scheduleId: schedule.id,
+              type: "schedule_share",
+              message: `Schedule shared: ${schedule.title || "Untitled Schedule"}`,
+            }),
+          ),
+        ),
+      );
+      onShared?.();
+      onClose();
+    } catch (err: any) {
+      console.error("Failed to send notifications", err);
+      setFriendsError(err?.message ?? "Failed to share schedule");
+    } finally {
+      setIsSharing(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -167,7 +179,7 @@ export default function ShareSchedulesModal({
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-[0.32em] text-cyan-200/80">
-                  Share Preview
+                  Friends Only
                 </p>
                 <h2
                   id="share-schedules-heading"
@@ -201,66 +213,56 @@ export default function ShareSchedulesModal({
               </button>
             </div>
 
-            <div className="mt-8 space-y-4">
-              <div className="relative">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search users by name..."
-                  className="w-full rounded-xl border border-white/15 bg-white/10 px-4 py-3 pr-12 text-sm text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-cyan-400/40 focus:border-cyan-400/40"
-                />
-                <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-white/50">
-                  <svg
-                    className="h-5 w-5"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
+            <div className="mt-8 rounded-2xl border border-white/12 bg-white/5 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-white">Choose friends</h3>
+                  <p className="mt-1 text-xs leading-5 text-white/55">
+                    Select from your accepted friends to send this schedule.
+                  </p>
+                </div>
+                {onManageFriends ? (
+                  <button
+                    type="button"
+                    onClick={onManageFriends}
+                    className="rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 transition-colors hover:bg-cyan-400/15"
                   >
-                    <circle cx="11" cy="11" r="8" />
-                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                  </svg>
-                </span>
+                    Manage Friends
+                  </button>
+                ) : null}
               </div>
 
-              <div className="max-h-72 overflow-y-auto rounded-2xl border border-white/12 bg-white/5 p-3">
-                {loadingUsers ? (
-                  <p className="text-sm text-white/50 px-2 py-3">
-                    Loading users...
-                  </p>
-                ) : usersError ? (
-                  <p className="text-sm text-red-300/80 px-2 py-3">
-                    {usersError}
-                  </p>
-                ) : filteredUsers.length === 0 ? (
-                  <p className="text-sm text-white/50 px-2 py-3">
-                    No users found.
-                  </p>
+              <div className="mt-4 max-h-72 overflow-y-auto rounded-2xl border border-white/12 bg-white/5 p-3">
+                {loadingFriends ? (
+                  <p className="px-2 py-3 text-sm text-white/50">Loading friends...</p>
+                ) : friendsError ? (
+                  <p className="px-2 py-3 text-sm text-red-300/80">{friendsError}</p>
+                ) : friends.length === 0 ? (
+                  <div className="px-2 py-3 text-sm text-white/50">
+                    <p>No accepted friends yet.</p>
+                    <p className="mt-2 text-white/40">
+                      Add and manage friends from the Friends button first.
+                    </p>
+                  </div>
                 ) : (
                   <ul className="space-y-2">
-                    {filteredUsers.map((user) => {
-                      const name = `${user.firstName} ${user.lastName}`.trim();
+                    {friends.map((user) => {
+                      const name = `${user.firstName} ${user.lastName}`.trim() || user.email;
                       const checked = selectedUserIds.includes(user.id);
+
                       return (
-                        <li
-                          key={user.id}
-                          className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => toggleUserSelection(user.id)}
-                            className="h-4 w-4 rounded border-white/30 bg-white/10 accent-cyan-500"
-                          />
-                          <span className="text-sm text-white/80">
-                            {name || user.email}
-                          </span>
-                          <span className="ml-auto text-xs text-white/40">
-                            {user.email}
-                          </span>
+                        <li key={user.id}>
+                          <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleUserSelection(user.id)}
+                              className="h-4 w-4 rounded border-white/30 bg-white/10 accent-cyan-500"
+                              aria-label={name}
+                            />
+                            <span className="text-sm text-white/85">{name}</span>
+                            <span className="ml-auto text-xs text-white/40">{user.email}</span>
+                          </label>
                         </li>
                       );
                     })}
@@ -280,10 +282,10 @@ export default function ShareSchedulesModal({
               <button
                 type="button"
                 onClick={handleSend}
-                disabled={selectedUserIds.length === 0}
+                disabled={isSharing || selectedUserIds.length === 0}
                 className="rounded-xl bg-gradient-to-r from-cyan-500 via-sky-500 to-blue-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-cyan-500/30 transition-all hover:shadow-cyan-500/45 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Send
+                {isSharing ? "Sharing..." : shareButtonLabel}
               </button>
             </div>
           </div>

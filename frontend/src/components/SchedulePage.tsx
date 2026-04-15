@@ -4,6 +4,7 @@ import CreateRuleModal from "./CreateRuleModal";
 import ShareSchedulesModal, {
   type ShareableScheduleSummary,
 } from "./ShareSchedulesModal";
+import FriendsModal from "./FriendsModal";
 import { logout } from "../utils/auth";
 import { fetchExercises, createExercise, deleteExercise, type ExerciseDto } from "../api/exercises";
 import { fetchRules, createRule, updateRule, deleteRule, type RuleDto } from "../api/rules";
@@ -160,6 +161,8 @@ export default function SchedulePage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isFriendsModalOpen, setIsFriendsModalOpen] = useState(false);
+  const [shareSuccess, setShareSuccess] = useState(false);
   const [lastSavedSnapshot, setLastSavedSnapshot] = useState<string>("");
   const [scheduleLoaded, setScheduleLoaded] = useState(false);
   const [confirmDeleteSchedule, setConfirmDeleteSchedule] = useState<{
@@ -518,6 +521,11 @@ export default function SchedulePage() {
       title: scheduleTitle || "Untitled Schedule",
     });
   }, [scheduleId, scheduleTitle]);
+
+  const handleShareSuccess = useCallback(() => {
+    setShareSuccess(true);
+    window.setTimeout(() => setShareSuccess(false), 2500);
+  }, []);
 
   const confirmDeleteScheduleAction = useCallback(async () => {
     if (!confirmDeleteSchedule || !userId) return;
@@ -1549,6 +1557,27 @@ const confirmDeleteExercise = useCallback(async () => {
             </button>
             <button
               type="button"
+              onClick={() => setIsFriendsModalOpen(true)}
+              className="relative z-10 inline-flex items-center gap-2 rounded-lg border border-violet-400/25 bg-violet-400/10 px-4 py-2 text-sm font-medium text-violet-100 transition-colors hover:bg-violet-400/15 hover:text-white"
+            >
+              <svg
+                className="h-4 w-4 shrink-0"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                <circle cx="8.5" cy="7" r="4" />
+                <path d="M20 8v6" />
+                <path d="M23 11h-6" />
+              </svg>
+              <span>Friends</span>
+            </button>
+            <button
+              type="button"
               onClick={() => setIsShareModalOpen(true)}
               className="relative z-10 inline-flex items-center gap-2 rounded-lg border border-cyan-400/25 bg-cyan-400/10 px-4 py-2 text-sm font-medium text-cyan-100 transition-colors hover:bg-cyan-400/15 hover:text-white"
             >
@@ -1701,6 +1730,14 @@ const confirmDeleteExercise = useCallback(async () => {
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
                   Saved!
+                </span>
+              )}
+              {shareSuccess && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-cyan-500/20 border border-cyan-400/30 px-3 py-1.5 text-xs font-medium text-cyan-200">
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  Schedule shared!
                 </span>
               )}
               {/* Save error badge */}
@@ -2276,7 +2313,17 @@ const confirmDeleteExercise = useCallback(async () => {
       <ShareSchedulesModal
         isOpen={isShareModalOpen}
         onClose={() => setIsShareModalOpen(false)}
+        onManageFriends={() => {
+          setIsShareModalOpen(false);
+          setIsFriendsModalOpen(true);
+        }}
+        onShared={handleShareSuccess}
         schedules={currentScheduleSharePreview}
+      />
+
+      <FriendsModal
+        isOpen={isFriendsModalOpen}
+        onClose={() => setIsFriendsModalOpen(false)}
       />
 
       {/* Add Exercise Modal */}

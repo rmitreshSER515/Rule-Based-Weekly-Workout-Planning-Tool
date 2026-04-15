@@ -572,7 +572,7 @@ export default function CompareSchedulesPage() {
                         onClick={() => setAllExercisesExpanded((v) => !v)}
                         className="flex items-center gap-2 px-4 py-3 font-semibold text-white border-b border-white/5 hover:bg-white/5 transition-colors text-left"
                       >
-                        Exercises
+                        Number of Exercises
                         <svg
                           width="12"
                           height="12"

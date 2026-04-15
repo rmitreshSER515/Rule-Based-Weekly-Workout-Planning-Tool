@@ -4,7 +4,7 @@ import { HydratedDocument } from 'mongoose';
 export type NotificationDocument = HydratedDocument<Notification>;
 
 export type NotificationStatus = 'pending' | 'accepted' | 'declined';
-export type NotificationType = 'schedule_share';
+export type NotificationType = 'schedule_share' | 'friend_request';
 
 @Schema({ timestamps: true })
 export class Notification {
@@ -14,8 +14,8 @@ export class Notification {
   @Prop({ required: true })
   fromUserId: string;
 
-  @Prop({ required: true })
-  scheduleId: string;
+  @Prop()
+  scheduleId?: string;
 
   @Prop({ required: true })
   message: string;
