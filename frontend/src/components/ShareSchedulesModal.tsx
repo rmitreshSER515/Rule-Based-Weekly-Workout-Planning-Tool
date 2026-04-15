@@ -28,7 +28,26 @@ export default function ShareSchedulesModal({
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [usersError, setUsersError] = useState("");
 
-  const filteredUsers = useMemo(() => users, [users]);
+  const currentUserId = useMemo(() => {
+    if (!isOpen) return null;
+    try {
+      const stored = localStorage.getItem("user");
+      if (!stored) return null;
+      const u = JSON.parse(stored) as { id?: string; _id?: string };
+      const id = u.id ?? u._id;
+      return typeof id === "string" ? id : null;
+    } catch {
+      return null;
+    }
+  }, [isOpen]);
+
+  const filteredUsers = useMemo(
+    () =>
+      currentUserId
+        ? users.filter((u) => u.id !== currentUserId)
+        : users,
+    [users, currentUserId],
+  );
 
   const toggleUserSelection = (id: string) => {
     setSelectedUserIds((prev) =>
@@ -46,6 +65,7 @@ export default function ShareSchedulesModal({
     const notifications = [];
     for (const schedule of schedules) {
       for (const userId of selectedUserIds) {
+        if (userId === senderId) continue;
         notifications.push(
           createNotification({
             userId,
