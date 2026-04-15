@@ -17,6 +17,20 @@ type CreateNotificationInput = {
   message: string;
 };
 
+/** One `(shared)` suffix; strips repeated leading/trailing markers so titles don't stack. */
+function titleForSharedCopy(rawTitle: string | undefined): string {
+  let t = (rawTitle ?? '').trim();
+  const leading = /^\s*\(shared\)\s*/i;
+  const trailing = /\s*\(shared\)\s*$/i;
+  let prev = '';
+  while (prev !== t) {
+    prev = t;
+    t = t.replace(leading, '').replace(trailing, '').trim();
+  }
+  const base = t || 'Untitled Schedule';
+  return `${base} (shared)`;
+}
+
 @Injectable()
 export class NotificationsService {
   constructor(
@@ -119,7 +133,7 @@ export class NotificationsService {
 
     await this.schedulesService.create({
       userId,
-      title: `${schedule.title} (shared)`,
+      title: titleForSharedCopy(schedule.title),
       startDate: schedule.startDate,
       endDate: schedule.endDate,
       selectedRuleIds: newRuleIds,
