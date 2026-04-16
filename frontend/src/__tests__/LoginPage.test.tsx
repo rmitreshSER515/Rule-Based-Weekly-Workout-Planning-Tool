@@ -50,7 +50,7 @@ describe("LoginPage", () => {
    render(<LoginPage />);
 
 
-   expect(screen.getByText("Fitness Tracker")).toBeInTheDocument();
+   expect(screen.getByText("Workout Planner")).toBeInTheDocument();
    expect(screen.getByPlaceholderText("Email Address")).toBeInTheDocument();
    expect(screen.getByPlaceholderText("Password")).toBeInTheDocument();
    expect(
@@ -268,4 +268,3 @@ describe("LoginPage", () => {
    });
  });
 });
-

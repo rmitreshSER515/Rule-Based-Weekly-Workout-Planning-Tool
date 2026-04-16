@@ -98,3 +98,26 @@ export async function saveSchedule(
 
   return data as ScheduleDto;
 }
+
+export async function deleteSchedule(
+  id: string,
+  userId: string,
+): Promise<ScheduleDto> {
+  const res = await fetch(
+    `${API_URL}/schedules/${encodeURIComponent(id)}?userId=${encodeURIComponent(
+      userId
+    )}`,
+    {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+    }
+  );
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data?.message ?? "Failed to delete schedule");
+  }
+
+  return data as ScheduleDto;
+}

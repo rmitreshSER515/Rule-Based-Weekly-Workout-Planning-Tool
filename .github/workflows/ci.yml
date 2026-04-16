@@ -1,13 +1,19 @@
-name: CI – Run Tests on Pull Request
+name: CI – Build & Test
 
 on:
   pull_request:
-    branches: [main, develop]
+    branches:
+      - main
+      - develop
+  push:
+    branches:
+      - main
+  workflow_dispatch:
 
 jobs:
-  # ── Backend Tests (Jest / NestJS) ──────────────────────────────────
-  backend-tests:
-    name: Backend Tests
+  # ── Backend Build & Tests (Jest / NestJS) ───────────────────────────
+  backend:
+    name: Backend Build & Tests
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -27,15 +33,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build backend
+        run: npm run build
+
       - name: Run backend tests
         run: npm test -- --verbose 2>&1
 
       - name: Run backend tests with coverage
         run: npm run test:cov -- --verbose 2>&1
 
-  # ── Frontend Tests (Vitest / React) ────────────────────────────────
-  frontend-tests:
-    name: Frontend Tests
+  # ── Frontend Build & Tests (Vitest / React) ─────────────────────────
+  frontend:
+    name: Frontend Build & Tests
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -54,6 +63,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Build frontend
+        run: npm run build
 
       - name: Run frontend tests
         run: npm test -- --reporter=verbose 2>&1

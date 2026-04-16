@@ -12,13 +12,14 @@ import { SchedulesModule } from './schedules/schedules.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: join(__dirname, '..', '.env'),
+      envFilePath: [join(process.cwd(), '.env'), join(__dirname, '..', '.env')],
     }),
 
     MongooseModule.forRoot(
@@ -32,6 +33,7 @@ import { AuthModule } from './auth/auth.module';
     MetricsModule,
     UsersModule,
     AuthModule,
+    NotificationsModule,
 
     
   ],

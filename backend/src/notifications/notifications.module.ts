@@ -1,0 +1,25 @@
+import { Module } from '@nestjs/common';
+import { MongooseModule } from '@nestjs/mongoose';
+import { Notification, NotificationSchema } from './entities/notification.schema';
+import { NotificationsController } from './notifications.controller';
+import { NotificationsService } from './notifications.service';
+import { SchedulesModule } from '../schedules/schedules.module';
+import { ExercisesModule } from '../exercises/exercises.module';
+import { RulesModule } from '../rules/rules.module';
+import { User, UserSchema } from '../users/user.schema';
+
+@Module({
+  imports: [
+    MongooseModule.forFeature([
+      { name: Notification.name, schema: NotificationSchema },
+      { name: User.name, schema: UserSchema },
+    ]),
+    SchedulesModule,
+    ExercisesModule,
+    RulesModule,
+  ],
+  controllers: [NotificationsController],
+  providers: [NotificationsService],
+  exports: [NotificationsService],
+})
+export class NotificationsModule {}

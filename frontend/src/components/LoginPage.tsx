@@ -10,6 +10,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
+  const [submitError, setSubmitError] = useState("");
   const [touched, setTouched] = useState({ email: false, password: false });
   const navigate = useNavigate();
 
@@ -36,6 +37,7 @@ export default function LoginPage() {
 
     setEmailError("");
     setPasswordError("");
+    setSubmitError("");
 
     let hasError = false;
 
@@ -88,7 +90,7 @@ export default function LoginPage() {
       navigate("/fitness");
     } catch (err: any) {
       const msg = err?.message || "Login failed";
-      setPasswordError(msg);
+      setSubmitError(msg);
     } finally {
       setIsLoading(false);
     }
@@ -120,7 +122,7 @@ export default function LoginPage() {
         <div className="rounded-2xl border border-white/15 bg-white/10 backdrop-blur-xl shadow-[0_18px_60px_rgba(0,0,0,0.45)]">
           <div className="pt-8 px-8 text-center">
             <h1 className="text-4xl font-extrabold tracking-wide text-white drop-shadow">
-              Fitness Tracker
+              Workout Planner
             </h1>
             <p className="mt-2 text-white/70 text-sm">
               Sign in to plan your workouts
@@ -134,6 +136,7 @@ export default function LoginPage() {
                 value={emailOrUser}
                 onChange={(e) => {
                   setEmailOrUser(e.target.value);
+                  setSubmitError("");
                 }}
                 onBlur={() => setTouched((prev) => ({ ...prev, email: true }))}
                 placeholder="Email Address"
@@ -168,6 +171,7 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => {
                     setPassword(e.target.value);
+                    setSubmitError("");
                   }}
                   onBlur={() => setTouched((prev) => ({ ...prev, password: true }))}
                   placeholder="Password"
@@ -212,6 +216,9 @@ export default function LoginPage() {
               
               {passwordError && (
                 <p className="text-red-400 text-xs mt-1.5 ml-5">{passwordError}</p>
+              )}
+              {!passwordError && submitError && (
+                <p className="text-red-400 text-xs mt-1.5 ml-5">{submitError}</p>
               )}
             </div>
 

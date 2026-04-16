@@ -1,10 +1,16 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { logout } from "../utils/auth";
-import { fetchSchedules } from "../api/schedules";
+import { fetchSchedules, deleteSchedule } from "../api/schedules";
+import {
+  fetchNotifications,
+  updateNotificationStatus,
+  type NotificationDto,
+} from "../api/notifications";
 import ShareSchedulesModal, {
   type ShareableScheduleSummary,
 } from "./ShareSchedulesModal";
+import FriendsModal from "./FriendsModal";
 
 type ScheduleCard = {
   id: string;
@@ -20,10 +26,21 @@ export default function FitnessTrackerPage() {
   const [schedules, setSchedules] = useState<ScheduleCard[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isFriendsModalOpen, setIsFriendsModalOpen] = useState(false);
+  const [shareSuccessMessage, setShareSuccessMessage] = useState("");
+  const [notifications, setNotifications] = useState<NotificationDto[]>([]);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [confirmDeleteSchedule, setConfirmDeleteSchedule] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
 
   const [selectedScheduleIds, setSelectedScheduleIds] = useState<string[]>([]);
   const canCompare = selectedScheduleIds.length >= 2;
   const canShare = selectedScheduleIds.length >= 1;
+  const hasPendingNotifications = notifications.some(
+    (n) => n.status === "pending"
+  );
 
   
   const [searchQuery, setSearchQuery] = useState("");
@@ -75,14 +92,85 @@ export default function FitnessTrackerPage() {
   }, [userId]);
 
   useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    fetchNotifications(userId)
+      .then((items) => {
+        if (!cancelled) setNotifications(items);
+      })
+      .catch(() => {
+        if (!cancelled) setNotifications([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  useEffect(() => {
     const ids = new Set(schedules.map((s) => s.id));
     setSelectedScheduleIds((prev) => prev.filter((id) => ids.has(id)));
   }, [schedules]);
 
   const handleLogout = () => logout(navigate);
+  const handleDeleteSchedule = (schedule: ScheduleCard) => {
+    setConfirmDeleteSchedule({
+      id: schedule.id,
+      title: schedule.title || "Untitled Schedule",
+    });
+  };
+
+  const confirmDeleteScheduleAction = async () => {
+    if (!confirmDeleteSchedule || !userId) return;
+    const target = confirmDeleteSchedule;
+    setConfirmDeleteSchedule(null);
+    try {
+      await deleteSchedule(target.id, userId);
+      setSchedules((prev) => prev.filter((s) => s.id !== target.id));
+      setSelectedScheduleIds((prev) => prev.filter((id) => id !== target.id));
+    } catch (err) {
+      console.error("Failed to delete schedule", err);
+    }
+  };
+  const handleNotificationAction = async (
+    notificationId: string,
+    status: "accepted" | "declined"
+  ) => {
+    if (!userId) return;
+    try {
+      const updated = await updateNotificationStatus(notificationId, {
+        userId,
+        status,
+      });
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === updated.id ? updated : n))
+      );
+      if (status === "accepted") {
+        const items = await fetchSchedules(userId);
+        setSchedules(
+          items.map((item) => ({
+            id: item.id,
+            title: item.title,
+            startDate: item.startDate,
+            endDate: item.endDate,
+          }))
+        );
+      }
+    } catch (err) {
+      console.error("Failed to update notification", err);
+    }
+  };
 
   const handleCreateSchedule = () => {
     navigate("/schedules", { state: { mode: "create" } });
+  };
+
+  const handleShareSuccess = () => {
+    setShareSuccessMessage(
+      selectedScheduleIds.length > 1
+        ? "Schedules shared successfully"
+        : "Schedule shared successfully",
+    );
+    window.setTimeout(() => setShareSuccessMessage(""), 2500);
   };
 
   const handleOpenSchedule = (schedule: ScheduleCard) => {
@@ -136,17 +224,114 @@ export default function FitnessTrackerPage() {
       <div className="relative z-10 min-h-screen px-6 py-8">
         <div className="mx-auto max-w-7xl">
           <div className="mb-8 border-b border-white/15 pb-6">
-            <div className="flex items-center justify-between gap-4">
-              <div className="w-full text-center">
+            <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
+              <div className="w-full xl:flex-1 xl:pr-6">
                 <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-wide text-white drop-shadow">
-                  Fitness Page
+                  Workout Planner
                 </h1>
-                <p className="mt-3 text-sm sm:text-base text-white/65">
+                <p className="mt-3 text-sm sm:text-base text-white/65 xl:max-w-xl">
                   Create, view, and compare your schedules
                 </p>
               </div>
 
-              <div className="absolute right-6 top-8 flex items-center gap-3">
+              <div className="flex flex-wrap items-center justify-start gap-3 xl:max-w-[48rem] xl:justify-end">
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setIsNotificationsOpen((prev) => !prev)
+                    }
+                    className="relative rounded-xl border border-white/20 bg-white/5 p-2.5 text-white/80 hover:bg-white/10 transition-colors"
+                    aria-label="Notifications"
+                  >
+                    <svg
+                      className="h-5 w-5"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+                      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                    </svg>
+                    {hasPendingNotifications && (
+                      <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-slate-950" />
+                    )}
+                  </button>
+
+                  {isNotificationsOpen && (
+                    <div className="absolute right-0 mt-3 w-80 max-h-96 overflow-y-auto rounded-2xl border border-white/15 bg-slate-900/95 backdrop-blur-xl shadow-2xl z-50">
+                      <div className="px-4 py-3 border-b border-white/10 text-sm font-semibold text-white/80">
+                        Notifications
+                      </div>
+                      {notifications.length === 0 ? (
+                        <div className="px-4 py-6 text-sm text-white/50">
+                          No notifications yet.
+                        </div>
+                      ) : (
+                        <div className="p-3 space-y-3">
+                          {notifications.map((n) => (
+                            <div
+                              key={n.id}
+                              className="rounded-xl border border-white/10 bg-white/5 px-3 py-3"
+                            >
+                              <p className="text-sm text-white/80">
+                                {n.message}
+                              </p>
+                              <div className="mt-2 flex items-center justify-end gap-2">
+                                {n.status === "pending" ? (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleNotificationAction(
+                                          n.id,
+                                          "declined"
+                                        )
+                                      }
+                                      className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white/70 hover:bg-white/10"
+                                    >
+                                      Decline
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleNotificationAction(
+                                          n.id,
+                                          "accepted"
+                                        )
+                                      }
+                                      className="rounded-lg bg-emerald-500/20 border border-emerald-400/30 px-3 py-1.5 text-xs font-semibold text-emerald-200 hover:bg-emerald-500/30"
+                                    >
+                                      Accept
+                                    </button>
+                                  </>
+                                ) : (
+                                  <span className="text-xs text-white/40">
+                                    {n.status === "accepted"
+                                      ? "Accepted"
+                                      : "Declined"}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsFriendsModalOpen(true)}
+                  className="rounded-xl border border-violet-400/30 bg-violet-400/10 px-5 py-2.5 text-sm font-semibold text-violet-100 backdrop-blur-xl transition-all hover:bg-violet-400/15 hover:text-white"
+                >
+                  Friends
+                </button>
+
                 <button
                   type="button"
                   disabled={!canShare}
@@ -190,9 +375,23 @@ export default function FitnessTrackerPage() {
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="rounded-xl border border-white/20 bg-white/5 px-4 py-2.5 text-sm font-medium text-white/90 backdrop-blur-xl transition-colors hover:bg-white/10 hover:text-white"
+                  className="rounded-xl border border-white/20 bg-white/5 p-2.5 text-white/80 backdrop-blur-xl transition-colors hover:bg-white/10 hover:text-white"
+                  aria-label="Log out"
+                  title="Log out"
                 >
-                  Log out
+                  <svg
+                    className="h-5 w-5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
+                  </svg>
                 </button>
               </div>
             </div>
@@ -200,12 +399,22 @@ export default function FitnessTrackerPage() {
 
           <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
             <div className="mb-6 flex items-center justify-between">
-              <div className="text-sm text-white/50">
-                Selected for actions:{" "}
-                <span className="text-white/80 font-medium">
-                  {selectedScheduleIds.length}
-                </span>{" "}
-                (share 1+, compare 2+)
+              <div className="flex items-center gap-3 text-sm text-white/50">
+                <span>
+                  Selected for actions:{" "}
+                  <span className="text-white/80 font-medium">
+                    {selectedScheduleIds.length}
+                  </span>{" "}
+                  (share 1+, compare 2+)
+                </span>
+                {shareSuccessMessage ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 border border-emerald-400/30 px-3 py-1.5 text-xs font-medium text-emerald-300">
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    {shareSuccessMessage}
+                  </span>
+                ) : null}
               </div>
               
               <div className="flex items-center gap-3">
@@ -330,6 +539,33 @@ export default function FitnessTrackerPage() {
                           <path d="M20 6 9 17l-5-5" />
                         </svg>
                       </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleDeleteSchedule(schedule);
+                        }}
+                        className="absolute right-4 bottom-4 z-10 inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/15 bg-white/5 text-white/50 transition-colors hover:bg-red-500/20 hover:text-red-200"
+                        aria-label={`Delete ${schedule.title ?? "schedule"}`}
+                        title="Delete schedule"
+                      >
+                        <svg
+                          className="h-4 w-4"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                          <line x1="10" y1="11" x2="10" y2="17" />
+                          <line x1="14" y1="11" x2="14" y2="17" />
+                        </svg>
+                      </button>
 
                       <div className="mb-4 border-b border-white/10 pb-4 pr-12">
                         <h3 className="line-clamp-2 text-2xl font-bold leading-tight text-white">
@@ -382,8 +618,71 @@ export default function FitnessTrackerPage() {
       <ShareSchedulesModal
         isOpen={isShareModalOpen}
         onClose={() => setIsShareModalOpen(false)}
+        onManageFriends={() => {
+          setIsShareModalOpen(false);
+          setIsFriendsModalOpen(true);
+        }}
+        onShared={handleShareSuccess}
         schedules={selectedSchedulePreviews}
       />
+
+      <FriendsModal
+        isOpen={isFriendsModalOpen}
+        onClose={() => setIsFriendsModalOpen(false)}
+      />
+
+      {confirmDeleteSchedule && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={() => setConfirmDeleteSchedule(null)}
+        >
+          <div
+            className="relative w-full max-w-sm rounded-2xl border border-red-400/20 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 shadow-2xl shadow-black/60"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="absolute inset-0 rounded-2xl ring-1 ring-inset ring-red-500/10 pointer-events-none" />
+            <div className="relative p-6">
+              <div className="flex items-start gap-4 mb-6">
+                <div className="shrink-0 rounded-full bg-red-500/10 p-2.5 ring-1 ring-red-400/20">
+                  <svg className="h-5 w-5 text-red-400/80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                    <line x1="10" y1="11" x2="10" y2="17" />
+                    <line x1="14" y1="11" x2="14" y2="17" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-white/90">Delete schedule</h3>
+                  <p className="mt-1.5 text-sm text-white/40 leading-relaxed">
+                    Are you sure you want to delete{" "}
+                    <span className="font-medium text-white/70">
+                      "{confirmDeleteSchedule.title}"
+                    </span>
+                    ? This action cannot be undone.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setConfirmDeleteSchedule(null)}
+                  className="flex-1 rounded-xl border border-white/10 bg-white/5 text-white/70 py-2.5 text-sm font-medium hover:bg-white/8 hover:text-white/90 transition-all duration-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmDeleteScheduleAction}
+                  className="flex-1 rounded-xl bg-red-500/20 border border-red-400/20 py-2.5 text-sm font-semibold text-red-300 hover:bg-red-500/30 hover:border-red-400/30 hover:text-red-200 transition-all duration-200"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
