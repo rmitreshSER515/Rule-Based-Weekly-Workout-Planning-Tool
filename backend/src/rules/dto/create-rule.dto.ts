@@ -37,7 +37,7 @@ export class CreateRuleDto {
 
   @IsString()
   @IsIn(RESTRICTIONS)
-  thenRestriction: RestrictionValue;
+  thenRestriction!: RestrictionValue;
 
   @IsBoolean()
   @IsOptional()

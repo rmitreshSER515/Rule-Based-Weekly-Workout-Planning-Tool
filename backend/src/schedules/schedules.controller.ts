@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -29,6 +30,13 @@ export class SchedulesController {
   @HttpCode(HttpStatus.OK)
   async update(@Param('id') id: string, @Body() dto: SaveScheduleDto) {
     const schedule = await this.schedulesService.update(id, dto);
+    return this.toResponse(schedule);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  async delete(@Param('id') id: string, @Query('userId') userId: string) {
+    const schedule = await this.schedulesService.delete(id, userId);
     return this.toResponse(schedule);
   }
 
