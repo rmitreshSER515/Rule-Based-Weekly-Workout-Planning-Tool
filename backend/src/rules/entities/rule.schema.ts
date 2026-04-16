@@ -44,7 +44,7 @@ export class Rule {
   @Prop({ type: Object, required: true })
   thenCondition: Condition;
 
-  @Prop({ default: 'notAllowed' })
+  @Prop({ type: String, default: 'notAllowed' })
   action: RuleAction;
 
   @Prop({ default: true })
