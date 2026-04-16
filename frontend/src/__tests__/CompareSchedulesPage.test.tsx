@@ -138,7 +138,7 @@ describe("CompareSchedulesPage", () => {
 
     await user.click(scheduleButton!);
 
-    expect(await screen.findByText("Exercises")).toBeInTheDocument();
+    expect(await screen.findByText("Number of Exercises")).toBeInTheDocument();
     expect(screen.getByText("Average Intensity")).toBeInTheDocument();
     expect(screen.getByText("Rest Days")).toBeInTheDocument();
   });
