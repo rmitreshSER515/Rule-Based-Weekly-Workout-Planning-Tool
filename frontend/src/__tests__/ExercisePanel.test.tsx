@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import SchedulePage from "../components/SchedulePage";
 import { fetchExercises } from "../api/exercises";
 import { fetchRules } from "../api/rules";
@@ -33,20 +33,40 @@ describe("Exercise Panel", () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
+    vi.stubGlobal("localStorage", {
+      getItem: vi.fn((key: string) => {
+        if (key === "user") return JSON.stringify({ id: "test-user-123" });
+        return null;
+      }),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+      clear: vi.fn(),
+    });
+
     vi.mocked(fetchRules).mockResolvedValue([]);
     vi.mocked(fetchSchedule).mockResolvedValue(null);
+    vi.mocked(fetchExercises).mockResolvedValue([]);
+  });
 
-    vi.spyOn(Storage.prototype, "getItem").mockImplementation((key: string) => {
-      if (key === "user") return JSON.stringify({ id: "test-user-123" });
-      return null;
-    });
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it("renders exercises in the sidebar with names and notes", async () => {
     vi.mocked(fetchExercises).mockResolvedValue([
-      { id: "ex-1", userId: "test-user-123", name: "Running", notes: "Morning run" },
-      { id: "ex-2", userId: "test-user-123", name: "Swimming", notes: "Pool laps" },
-    ]);
+      {
+        id: "ex-1",
+        userId: "test-user-123",
+        name: "Running",
+        notes: "Morning run",
+      },
+      {
+        id: "ex-2",
+        userId: "test-user-123",
+        name: "Swimming",
+        notes: "Pool laps",
+      },
+    ] as any);
 
     render(<SchedulePage />);
 
@@ -64,5 +84,20 @@ describe("Exercise Panel", () => {
     expect(
       await screen.findByText("No exercises yet. Add one to get started.")
     ).toBeInTheDocument();
+  });
+
+  it("renders exercise names even when notes are missing", async () => {
+    vi.mocked(fetchExercises).mockResolvedValue([
+      {
+        id: "ex-1",
+        userId: "test-user-123",
+        name: "Cycling",
+        notes: "",
+      },
+    ] as any);
+
+    render(<SchedulePage />);
+
+    expect(await screen.findByText("Cycling")).toBeInTheDocument();
   });
 });
