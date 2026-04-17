@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import CompareSchedulesPage from "../components/CompareSchedulesPage";
 import { fetchSchedules } from "../api/schedules";
 import { fetchScheduleMetrics } from "../api/metrics";
@@ -79,23 +79,19 @@ describe("CompareSchedulesPage", () => {
       state: null,
     });
 
-    Object.defineProperty(window, "localStorage", {
-      value: {
-        getItem: vi.fn((key: string) => {
-          if (key === "user") {
-            return JSON.stringify({ id: "test-user-123" });
-          }
-          return null;
-        }),
-        setItem: vi.fn(),
-        removeItem: vi.fn(),
-        clear: vi.fn(),
-      },
-      writable: true,
+    vi.stubGlobal("localStorage", {
+      getItem: vi.fn((key: string) => {
+        if (key === "user") {
+          return JSON.stringify({ id: "test-user-123" });
+        }
+        return null;
+      }),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+      clear: vi.fn(),
     });
 
     vi.mocked(fetchSchedules).mockResolvedValue(mockSchedules as any);
-
     vi.mocked(fetchScheduleMetrics).mockResolvedValue({
       metrics: {
         exerciseIntensityBreakdown: [
@@ -104,6 +100,10 @@ describe("CompareSchedulesPage", () => {
         ],
       },
     } as any);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it("renders page heading", async () => {
@@ -141,6 +141,32 @@ describe("CompareSchedulesPage", () => {
     expect(await screen.findByText("Number of Exercises")).toBeInTheDocument();
     expect(screen.getByText("Average Intensity")).toBeInTheDocument();
     expect(screen.getByText("Rest Days")).toBeInTheDocument();
+  });
+
+  it("deselects a schedule when clicked again", async () => {
+    const user = userEvent.setup();
+    render(<CompareSchedulesPage />);
+
+    const scheduleText = await screen.findByText("Week 1 Plan");
+    const scheduleButton = scheduleText.closest("button");
+
+    expect(scheduleButton).not.toBeNull();
+
+    await user.click(scheduleButton!);
+    expect(await screen.findByText("Number of Exercises")).toBeInTheDocument();
+
+    await user.click(scheduleButton!);
+    expect(
+      await screen.findByText("Select schedules from the sidebar to compare")
+    ).toBeInTheDocument();
+  });
+
+  it("shows no schedules found when API returns empty list", async () => {
+    vi.mocked(fetchSchedules).mockResolvedValue([]);
+
+    render(<CompareSchedulesPage />);
+
+    expect(await screen.findByText("No schedules found.")).toBeInTheDocument();
   });
 
   it("navigates back when Back button is clicked", async () => {

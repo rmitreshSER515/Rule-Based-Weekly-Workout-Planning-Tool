@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import SchedulePage from "../components/SchedulePage";
 import { fetchExercises } from "../api/exercises";
 import { fetchRules } from "../api/rules";
@@ -29,7 +29,6 @@ vi.mock("../utils/exerciseIcons", () => ({
   getExerciseIcon: () => null,
 }));
 
-/** Build a YYYY-MM-DD date key for today + offset days. */
 const dateKey = (offsetDays: number): string => {
   const d = new Date();
   d.setDate(d.getDate() + offsetDays);
@@ -39,7 +38,6 @@ const dateKey = (offsetDays: number): string => {
   return `${y}-${m}-${day}`;
 };
 
-/** Expected header text for today + offset (matches SchedulePage's formatDayName). */
 const dayHeader = (offsetDays: number): string => {
   const d = new Date();
   d.setDate(d.getDate() + offsetDays);
@@ -54,14 +52,23 @@ describe("Calendar", () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
+    vi.stubGlobal("localStorage", {
+      getItem: vi.fn((key: string) => {
+        if (key === "user") return JSON.stringify({ id: "test-user-123" });
+        return null;
+      }),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+      clear: vi.fn(),
+    });
+
     vi.mocked(fetchExercises).mockResolvedValue([]);
     vi.mocked(fetchRules).mockResolvedValue([]);
     vi.mocked(fetchSchedule).mockResolvedValue(null);
+  });
 
-    vi.spyOn(Storage.prototype, "getItem").mockImplementation((key: string) => {
-      if (key === "user") return JSON.stringify({ id: "test-user-123" });
-      return null;
-    });
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it("renders calendar days with correct date headers", async () => {
@@ -96,12 +103,51 @@ describe("Calendar", () => {
           },
         ],
       },
-    });
+    } as any);
 
     render(<SchedulePage />);
 
     expect(await screen.findByText("Running")).toBeInTheDocument();
     expect(screen.getByText("4")).toBeInTheDocument();
     expect(screen.getByText("1h 30m")).toBeInTheDocument();
+  });
+
+  it("renders multiple exercises on the same calendar day", async () => {
+    const todayKey = dateKey(0);
+
+    vi.mocked(fetchSchedule).mockResolvedValue({
+      id: "sched-2",
+      userId: "test-user-123",
+      title: "Busy Week",
+      startDate: dateKey(0),
+      endDate: dateKey(6),
+      selectedRuleIds: [],
+      calendarExercises: {
+        [todayKey]: [
+          {
+            id: "cal-item-1",
+            exerciseId: "ex-1",
+            name: "Running",
+            notes: "Morning session",
+            intensity: "hard",
+            duration: { hours: "1", minutes: "0" },
+          },
+          {
+            id: "cal-item-2",
+            exerciseId: "ex-2",
+            name: "Swimming",
+            notes: "Evening laps",
+            intensity: "easy",
+            duration: { hours: "0", minutes: "45" },
+          },
+        ],
+      },
+    } as any);
+
+    render(<SchedulePage />);
+
+    expect(await screen.findByText("Running")).toBeInTheDocument();
+    expect(screen.getByText("Swimming")).toBeInTheDocument();
+    expect(screen.getByText(/45m/i)).toBeInTheDocument();
   });
 });
