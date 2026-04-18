@@ -5,6 +5,7 @@ import SchedulePage from "./components/SchedulePage";
 import CompareSchedulesPage from "./components/CompareSchedulesPage";
 import RegisterPage from "./components/RegisterPage";
 import ForgotPasswordPage from "./components/Forgotpasswordpage";
+import ResetPasswordPage from "./components/ResetPasswordPage";
 
 const token = () => localStorage.getItem("token");
 
@@ -24,6 +25,7 @@ export default function App() {
       <Route path="/login" element={<PublicOnlyRoute><LoginPage /></PublicOnlyRoute>} />
       <Route path="/register" element={<PublicOnlyRoute><RegisterPage /></PublicOnlyRoute>} />
       <Route path="/forgot-password" element={<PublicOnlyRoute><ForgotPasswordPage /></PublicOnlyRoute>} />
+      <Route path="/reset-password" element={<PublicOnlyRoute><ResetPasswordPage /></PublicOnlyRoute>} />
 
       <Route path="/fitness" element={<ProtectedRoute><FitnessTrackerPage /></ProtectedRoute>} />
       <Route path="/schedules" element={<ProtectedRoute><SchedulePage /></ProtectedRoute>} />

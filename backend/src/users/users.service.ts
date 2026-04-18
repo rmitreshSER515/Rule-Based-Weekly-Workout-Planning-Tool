@@ -73,6 +73,12 @@ export class UsersService {
     return this.toSummary(user);
   }
 
+  async setPasswordHashByUserId(userId: string, passwordHash: string) {
+    await this.userModel
+      .updateOne({ _id: userId }, { $set: { passwordHash } })
+      .exec();
+  }
+
   async searchUsers(query: string) {
     const normalized = query.trim().toLowerCase();
     const filter =

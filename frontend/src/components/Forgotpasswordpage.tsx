@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { getApiErrorMessage } from "../utils/apiError";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -7,6 +8,7 @@ export default function ForgotPasswordPage() {
   const [touched, setTouched] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
   const validateEmail = (value: string) => {
     if (!value.trim()) return "Email address is required";
@@ -28,15 +30,42 @@ export default function ForgotPasswordPage() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setTouched(true);
+    setSubmitError("");
     const error = validateEmail(email);
     setEmailError(error);
     if (error) return;
 
-    setIsLoading(true);
-    // Replace with your real API call
-    await new Promise((res) => setTimeout(res, 1500));
-    setIsLoading(false);
-    setSent(true);
+    try {
+      setIsLoading(true);
+      const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
+      const response = await fetch(`${API_URL}/auth/forgot-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (response.status === 429) {
+        setSubmitError(
+          "Too many attempts. Please wait about 15 minutes and try again.",
+        );
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          getApiErrorMessage(data, "Could not send reset email"),
+        );
+      }
+
+      setSent(true);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Something went wrong";
+      setSubmitError(msg);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const isFormValid = email.trim() && !emailError;
@@ -110,7 +139,7 @@ export default function ForgotPasswordPage() {
                   Forgot Password?
                 </h1>
                 <p className="mt-2 text-white/60 text-sm leading-relaxed px-4">
-                  No worries! Enter your email and we'll send you a verification code to reset your password.
+                  No worries! Enter your email and we&apos;ll send you a link to reset your password.
                 </p>
               </div>
 
@@ -169,9 +198,13 @@ export default function ForgotPasswordPage() {
                       Sending...
                     </>
                   ) : (
-                    "Send Verification Code"
+                    "Send reset link"
                   )}
                 </button>
+
+                {submitError ? (
+                  <p className="text-center text-sm text-red-400">{submitError}</p>
+                ) : null}
 
                 <p className="text-center text-sm text-white/70">
                   Remember your password?{" "}
@@ -202,10 +235,9 @@ export default function ForgotPasswordPage() {
               <div>
                 <h2 className="text-2xl font-extrabold text-white tracking-wide">Check your inbox</h2>
                 <p className="mt-2 text-white/60 text-sm leading-relaxed px-2">
-                  We've sent a verification code to{" "}
-                  <span className="text-white font-medium">{email}</span>.
-                  <br />
-                  It may take a few minutes to arrive.
+                  If an account exists for{" "}
+                  <span className="text-white font-medium">{email}</span>, you
+                  will receive an email with a reset link. It may take a few minutes.
                 </p>
               </div>
 
@@ -215,7 +247,7 @@ export default function ForgotPasswordPage() {
                   onClick={() => setSent(false)}
                   className="text-white underline underline-offset-4 hover:opacity-90"
                 >
-                  Resend code
+                  Try again
                 </button>
               </p>
 
