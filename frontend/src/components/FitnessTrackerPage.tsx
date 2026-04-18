@@ -226,9 +226,34 @@ export default function FitnessTrackerPage() {
           <div className="mb-8 border-b border-white/15 pb-6">
             <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
               <div className="w-full xl:flex-1 xl:pr-6">
-                <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-wide text-white drop-shadow">
-                  Workout Planner
-                </h1>
+                <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-wide text-white drop-shadow flex items-center justify-center gap-5">
+  <svg
+    width="64" height="64" viewBox="0 0 24 24" fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    style={{ animation: "dumbbellPulse 3s ease-in-out infinite" }}
+  >
+    <defs>
+      <linearGradient id="dbGrad" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stopColor="#e879f9" />
+        <stop offset="100%" stopColor="#22d3ee" />
+      </linearGradient>
+    </defs>
+    <rect x="1" y="8"   width="3"  height="8" rx="1.5" fill="url(#dbGrad)" />
+    <rect x="3.5" y="6" width="2.5" height="12" rx="1" fill="url(#dbGrad)" />
+    <rect x="6" y="11"  width="12" height="2"  rx="1"  fill="url(#dbGrad)" />
+    <rect x="18" y="6"  width="2.5" height="12" rx="1" fill="url(#dbGrad)" />
+    <rect x="20" y="8"  width="3"  height="8" rx="1.5" fill="url(#dbGrad)" />
+  </svg>
+
+  <style>{`
+    @keyframes dumbbellPulse {
+      0%, 100% { transform: translateY(0px) rotate(-10deg); opacity: 1; }
+      50%       { transform: translateY(-6px) rotate(10deg); opacity: 0.75; }
+    }
+  `}</style>
+
+  Workout Planner
+</h1>
                 <p className="mt-3 text-sm sm:text-base text-white/65 xl:max-w-xl">
                   Create, view, and compare your schedules
                 </p>
