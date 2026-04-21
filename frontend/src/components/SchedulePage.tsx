@@ -1932,7 +1932,7 @@ const confirmDeleteExercise = useCallback(async () => {
         {/* Calendar Grid - one week visible per scroll, 7 days fit equally */}
         <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
           {recoveryRecommendations.length > 0 && (
-            <div className="mx-auto w-full max-w-[1280px] px-4 pt-4">
+            <div className="w-full px-4 pt-4">
               <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-4">
                 <div className="flex items-start justify-between gap-4">
                   <div>
@@ -1985,7 +1985,7 @@ const confirmDeleteExercise = useCallback(async () => {
             </div>
           )}
           <div
-            className="schedule-calendar-scroll mx-auto flex-1 min-h-0 w-full max-w-[1280px] overflow-x-auto overflow-y-hidden scroll-smooth [container-type:inline-size]"
+            className="schedule-calendar-scroll flex-1 min-h-0 w-full overflow-x-auto overflow-y-hidden scroll-smooth [container-type:inline-size]"
             style={{
               scrollSnapType: weeks.length > 1 ? "x mandatory" : undefined,
               scrollbarGutter: "stable",
