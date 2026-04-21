@@ -12,9 +12,17 @@ export default function LoginPage() {
   const [passwordError, setPasswordError] = useState("");
   const [submitError, setSubmitError] = useState("");
   const [touched, setTouched] = useState({ email: false, password: false });
+  const [showSlowLoginHint, setShowSlowLoginHint] = useState(false);
   const navigate = useNavigate();
 
-  
+  useEffect(() => {
+    if (!isLoading) {
+      setShowSlowLoginHint(false);
+      return;
+    }
+    const t = window.setTimeout(() => setShowSlowLoginHint(true), 4000);
+    return () => window.clearTimeout(t);
+  }, [isLoading]);
 
   useEffect(() => {
     if (touched.email && emailOrUser) {
@@ -270,6 +278,13 @@ export default function LoginPage() {
                 "Login"
               )}
             </button>
+
+            {isLoading && showSlowLoginHint ? (
+              <p className="text-center text-xs text-white/55 leading-relaxed -mt-1">
+                Still signing you in — this can take a moment if the service was
+                idle.
+              </p>
+            ) : null}
 
             <p className="text-center text-sm text-white/70">
   Don&apos;t have an account?{" "}
