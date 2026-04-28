@@ -665,20 +665,22 @@ export default function SchedulePage() {
 
       const ifIntensity = normalizeIntensity(rule.ifExercise);
       const thenIntensity = normalizeIntensity(rule.thenExercise);
-      if (!ifIntensity || !thenIntensity) continue;
+      const ifAnyIntensity = rule.ifExercise.trim().toLowerCase() === "any intensity";
+      const thenAnyIntensity = rule.thenExercise.trim().toLowerCase() === "any intensity";
+      if (!ifAnyIntensity && !ifIntensity) continue;
+      if (!thenAnyIntensity && !thenIntensity) continue;
 
       const ifExerciseName = rule.ifActivityType.trim().toLowerCase();
       const thenExerciseName = rule.thenActivityType.trim().toLowerCase();
+      const ifAnyType = ifExerciseName === "any activity type";
+      const thenAnyType = thenExerciseName === "any activity type";
       const ifTiming = rule.ifTiming.trim().toLowerCase();
 
       for (const [dateKey, items] of Object.entries(calendarExercises)) {
         for (const ifItem of items) {
-          if (
-            ifItem.name.trim().toLowerCase() !== ifExerciseName ||
-            ifItem.intensity !== ifIntensity
-          ) {
-            continue;
-          }
+          const ifNameMatch = ifAnyType || ifItem.name.trim().toLowerCase() === ifExerciseName;
+          const ifIntensityMatch = ifAnyIntensity || ifItem.intensity === ifIntensity;
+          if (!ifNameMatch || !ifIntensityMatch) continue;
 
           let thenDateKey = dateKey;
           if (ifTiming === "the day before") thenDateKey = shiftDateKeyByDays(dateKey, 1);
@@ -686,12 +688,9 @@ export default function SchedulePage() {
 
           const thenItems = calendarExercises[thenDateKey] || [];
           for (const thenItem of thenItems) {
-            if (
-              thenItem.name.trim().toLowerCase() !== thenExerciseName ||
-              thenItem.intensity !== thenIntensity
-            ) {
-              continue;
-            }
+            const thenNameMatch = thenAnyType || thenItem.name.trim().toLowerCase() === thenExerciseName;
+            const thenIntensityMatch = thenAnyIntensity || thenItem.intensity === thenIntensity;
+            if (!thenNameMatch || !thenIntensityMatch) continue;
 
             addViolation(
               thenItem.id,
@@ -727,14 +726,20 @@ export default function SchedulePage() {
       for (const rule of relevantRules) {
         const ifIntensity = normalizeIntensity(rule.ifExercise);
         const thenIntensity = normalizeIntensity(rule.thenExercise);
-        if (!ifIntensity || !thenIntensity) continue;
+        const ifAnyIntensity = rule.ifExercise.trim().toLowerCase() === "any intensity";
+        const thenAnyIntensity = rule.thenExercise.trim().toLowerCase() === "any intensity";
+        if (!ifAnyIntensity && !ifIntensity) continue;
+        if (!thenAnyIntensity && !thenIntensity) continue;
 
         const ifExerciseName = rule.ifActivityType.trim().toLowerCase();
         const thenExerciseName = rule.thenActivityType.trim().toLowerCase();
+        const ifAnyType = ifExerciseName === "any activity type";
+        const thenAnyType = thenExerciseName === "any activity type";
         const ifTiming = rule.ifTiming.trim().toLowerCase();
 
         const candidateMatchesThen =
-          normalizedExerciseName === thenExerciseName && intensity === thenIntensity;
+          (thenAnyType || normalizedExerciseName === thenExerciseName) &&
+          (thenAnyIntensity || intensity === thenIntensity);
 
         if (candidateMatchesThen) {
           let ifDateKey = dateKey;
@@ -743,10 +748,9 @@ export default function SchedulePage() {
 
           const hasMatchingIf = (calendarExercises[ifDateKey] || []).some((entry) => {
             if (entry.id === itemId) return false;
-            return (
-              entry.name.trim().toLowerCase() === ifExerciseName &&
-              entry.intensity === ifIntensity
-            );
+            const nameMatch = ifAnyType || entry.name.trim().toLowerCase() === ifExerciseName;
+            const intensityMatch = ifAnyIntensity || entry.intensity === ifIntensity;
+            return nameMatch && intensityMatch;
           });
 
           if (hasMatchingIf) {
@@ -755,7 +759,8 @@ export default function SchedulePage() {
         }
 
         const candidateMatchesIf =
-          normalizedExerciseName === ifExerciseName && intensity === ifIntensity;
+          (ifAnyType || normalizedExerciseName === ifExerciseName) &&
+          (ifAnyIntensity || intensity === ifIntensity);
 
         if (candidateMatchesIf) {
           let thenDateKey = dateKey;
@@ -764,10 +769,9 @@ export default function SchedulePage() {
 
           const hasBlockedThen = (calendarExercises[thenDateKey] || []).some((entry) => {
             if (entry.id === itemId) return false;
-            return (
-              entry.name.trim().toLowerCase() === thenExerciseName &&
-              entry.intensity === thenIntensity
-            );
+            const nameMatch = thenAnyType || entry.name.trim().toLowerCase() === thenExerciseName;
+            const intensityMatch = thenAnyIntensity || entry.intensity === thenIntensity;
+            return nameMatch && intensityMatch;
           });
 
           if (hasBlockedThen) {

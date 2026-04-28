@@ -20,9 +20,8 @@ interface RuleData {
 }
 
 // Intensity levels (1-5) used across the app
-const exercises = ["Recovery", "Easy", "Medium", "Hard", "All-out effort"];
+const exercises = ["Any intensity", "Recovery", "Easy", "Medium", "Hard", "All-out effort"];
 const timings = ["the day before", "the day after", "the same day"];
-const restrictions = ["not allowed", "allowed"];
 
 export default function CreateRuleModal({
   isOpen,
@@ -43,7 +42,6 @@ export default function CreateRuleModal({
   const [ifTiming, setIfTiming] = useState(timings[0]);
   const [thenExercise, setThenExercise] = useState(exercises[0]);
   const [thenActivityType, setThenActivityType] = useState(firstSidebarExerciseName);
-  const [thenRestriction, setThenRestriction] = useState(restrictions[0]);
 
   const applyDefaults = () => {
     setRuleName("");
@@ -52,7 +50,6 @@ export default function CreateRuleModal({
     setIfTiming(timings[0]);
     setThenExercise(exercises[0]);
     setThenActivityType(firstSidebarExerciseName);
-    setThenRestriction(restrictions[0]);
   };
 
   useEffect(() => {
@@ -65,7 +62,6 @@ export default function CreateRuleModal({
       setIfTiming(initialRule.ifTiming ?? timings[0]);
       setThenExercise(initialRule.thenExercise ?? exercises[0]);
       setThenActivityType(initialRule.thenActivityType ?? firstSidebarExerciseName);
-      setThenRestriction(initialRule.thenRestriction ?? restrictions[0]);
       return;
     }
 
@@ -80,7 +76,7 @@ export default function CreateRuleModal({
       ifTiming,
       thenExercise,
       thenActivityType,
-      thenRestriction,
+      thenRestriction: "not allowed",
     });
     resetForm();
   };
@@ -170,9 +166,7 @@ export default function CreateRuleModal({
                       onChange={(e) => setIfActivityType(e.target.value)}
                       className="rounded-lg bg-teal-600/80 hover:bg-teal-600 text-white font-medium px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white/30 cursor-pointer transition-colors"
                     >
-                      {exercisesFromSidebar.length === 0 && (
-                        <option value="">No exercises available</option>
-                      )}
+                      <option value="Any activity type">Any activity type</option>
                       {exercisesFromSidebar.map((ex) => (
                         <option key={ex.id} value={ex.name}>
                           {ex.name}
@@ -213,9 +207,7 @@ export default function CreateRuleModal({
                       onChange={(e) => setThenActivityType(e.target.value)}
                       className="rounded-lg bg-teal-600/80 hover:bg-teal-600 text-white font-medium px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white/30 cursor-pointer transition-colors"
                     >
-                      {exercisesFromSidebar.length === 0 && (
-                        <option value="">No exercises available</option>
-                      )}
+                      <option value="Any activity type">Any activity type</option>
                       {exercisesFromSidebar.map((ex) => (
                         <option key={ex.id} value={ex.name}>
                           {ex.name}
@@ -223,17 +215,7 @@ export default function CreateRuleModal({
                       ))}
                     </select>
                     <span className="text-white">is</span>
-                    <select
-                      value={thenRestriction}
-                      onChange={(e) => setThenRestriction(e.target.value)}
-                      className="rounded-lg bg-teal-600/80 hover:bg-teal-600 text-white font-medium px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white/30 cursor-pointer transition-colors"
-                    >
-                      {restrictions.map((restriction) => (
-                        <option key={restriction} value={restriction}>
-                          {restriction}
-                        </option>
-                      ))}
-                    </select>
+                    <span className="text-white font-medium">not allowed</span>
                     <span className="text-white">.</span>
                   </div>
                 </div>
